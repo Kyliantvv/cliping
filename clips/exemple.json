@@ -1,0 +1,12 @@
+{
+  "source": "input/ma_video.mp4",
+  "captions": "work/ma_video/captions.json",
+  "layout": "split",
+  "facecam": [1500, 760, 400, 300],
+  "cam_height": 640,
+  "game_offset": 0.5,
+  "clips": [
+    {"name": "01_vol_voiture", "start": "00:12:03", "end": "00:12:31",
+     "hook": "Il se fait voler sa voiture en 3 secondes", "zooms": ["00:12:20"], "highlight": ["voiture"]}
+  ]
+}

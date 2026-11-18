@@ -1,0 +1,136 @@
+{
+  "source": "input/gta6_tout_savoir.mp4",
+  "captions": "work/gta6_tout_savoir/captions.json",
+  "layout": "blur",
+  "highlight": [
+    "police",
+    "étoiles",
+    "armes",
+    "RPG",
+    "map",
+    "immense",
+    "énorme",
+    "80€",
+    "100€",
+    "220 gigas",
+    "quatre",
+    "profil criminel",
+    "braquage",
+    "Red Dead",
+    "GTA V",
+    "chemise",
+    "Vice City",
+    "Leonida",
+    "animations",
+    "espèces",
+    "Jason",
+    "Lucia"
+  ],
+  "fixes": {
+    "à votre house": "à vos trousses",
+    "armes de pont": "armes de poing",
+    "des calages": "des kalachs",
+    "recouprez": "recouvre",
+    "Lucia Camino": "Lucia Caminos",
+    "Camino,": "Caminos,",
+    "Camino.": "Caminos.",
+    "Caminos": "Caminos",
+    "de de la": "de la",
+    "Leonidas": "Leonida",
+    "l'Unida": "Leonida",
+    "Floridakis": "Florida Keys",
+    "Port Guéland": "Port Gellhorn",
+    "Mont de Calaga": "Mount Kalaga",
+    "Booby Ike": "Boobie Ike",
+    "Drake One Priest": "Dre'Quan Priest",
+    "rejennant": "rejoignant",
+    "170 dix": "170",
+    "avec Ben,": "avec,"
+  },
+  "clips": [
+    {
+      "name": "01_police_tenue",
+      "start": 537.5,
+      "end": 600.9,
+      "hook": "La police de GTA VI va retenir tes vêtements",
+      "zooms": [
+        559.8,
+        568.0,
+        587.4
+      ]
+    },
+    {
+      "name": "02_combat_armes",
+      "start": 486.9,
+      "end": 545.5,
+      "hook": "Dans GTA VI tu ne pourras plus porter toutes tes armes",
+      "zooms": [
+        527.0,
+        541.0
+      ],
+      "outro": "La suite : la nouvelle police ➜ partie 2"
+    },
+    {
+      "name": "03_vice_city_map",
+      "start": 247.7,
+      "end": 319.3,
+      "hook": "Vice City est de retour et la map est énorme",
+      "zooms": [
+        249.5,
+        318.6
+      ]
+    },
+    {
+      "name": "04_monde_vivant",
+      "start": 319.5,
+      "end": 383.1,
+      "hook": "La map de GTA VI = GTA IV + RDR2 + GTA V",
+      "zooms": [
+        331.8,
+        349.0
+      ]
+    },
+    {
+      "name": "05_profil_criminel",
+      "start": 409.1,
+      "end": 482.7,
+      "hook": "Si tu tues tout le monde, GTA VI s'en souviendra",
+      "zooms": [
+        462.3,
+        471.8
+      ]
+    },
+    {
+      "name": "06_prix_infos",
+      "start": 41.3,
+      "end": 101.1,
+      "hook": "GTA VI : 80€, 220 Go et pas de vrai disque",
+      "zooms": [
+        62.9,
+        73.8,
+        90.3
+      ]
+    },
+    {
+      "name": "07_quatre_persos",
+      "start": 106.9,
+      "end": 165.7,
+      "hook": "Rockstar a failli mettre 4 personnages jouables",
+      "zooms": [
+        134.3
+      ],
+      "outro": "Qui sont Jason et Lucia ? ➜ partie 2"
+    },
+    {
+      "name": "08_jason_lucia",
+      "start": 168.6,
+      "end": 228.6,
+      "hook": "Le passé de Jason et Lucia dans GTA VI",
+      "zooms": [
+        204.8
+      ],
+      "outro": "Abonne-toi pour la suite"
+    }
+  ],
+  "jumpcut": true
+}

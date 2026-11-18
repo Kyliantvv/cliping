@@ -416,6 +416,8 @@ def zoom_expr(zooms):
 
 # ------------------------------------------------------------------ rendu
 def render(cfg, clip, enc):
+    # reglages video surchargeables par clip (la facecam bouge parfois pendant un stream)
+    cfg = {**cfg, **{k: clip[k] for k in ("facecam", "layout", "cam_height", "game_offset", "fg_zoom") if k in clip}}
     src = os.path.join(ROOT, cfg["source"])
     caps = load_caps(os.path.join(ROOT, cfg["captions"])) if cfg.get("captions") else []
     work = os.path.join(ROOT, os.path.dirname(cfg["captions"])) if cfg.get("captions") else None

@@ -1,0 +1,115 @@
+{
+ "source": "input/anyme_gta6_j1.mp4",
+ "captions": "work/anyme_gta6_j1/captions.json",
+ "layout": "split",
+ "facecam": [
+  0,
+  0,
+  358,
+  200
+ ],
+ "cam_height": 640,
+ "jumpcut": true,
+ "highlight": [
+  "gta",
+  "gta 6",
+  "titi",
+  "fenwick",
+  "xbox",
+  "play"
+ ],
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "FedWick": "Fenwick",
+  "fan week": "Fenwick",
+  "Fan week": "Fenwick",
+  "la tête de WAM": "la tête de ma mère",
+  "La tête de WAM": "La tête de ma mère",
+  "la tête de wham": "la tête de ma mère",
+  "La tête de wham": "La tête de ma mère",
+  "comme as ?": "comme ça ?",
+  "Oh la vague !": "Oh la vache !"
+ },
+ "clips": [
+  {
+   "name": "01_demandes_amis",
+   "start": "01:07:11",
+   "end": "01:08:38",
+   "hook": "250 DEMANDES D'AMIS AVANT MÊME DE LANCER GTA VI",
+   "zooms": [
+    "01:08:23"
+   ],
+   "impacts": [
+    "01:08:23"
+   ]
+  },
+  {
+   "name": "02_titi_le_dur",
+   "start": "01:11:54",
+   "end": "01:13:35",
+   "hook": "ANYME DÉCLARE LA GUERRE À TITI LE DUR",
+   "zooms": [
+    "01:12:31",
+    "01:13:31"
+   ]
+  },
+  {
+   "name": "03_hack_vocal",
+   "start": "01:13:41",
+   "end": "01:15:03",
+   "hook": "UN INCONNU LUI PARLE DANS SA PLAY EN PLEIN LIVE",
+   "zooms": [
+    "01:13:58",
+    "01:14:15"
+   ]
+  },
+  {
+   "name": "04_enfin_gta",
+   "start": "01:19:16",
+   "end": "01:20:30",
+   "hook": "IL LANCE ENFIN GTA VI APRÈS 15 MIN DE GALÈRE",
+   "zooms": [
+    "01:19:47"
+   ],
+   "impacts": [
+    "01:19:47"
+   ],
+   "outro": "La suite du live ➜ abonne-toi"
+  },
+  {
+   "name": "05_fenwick",
+   "start": "01:55:14",
+   "end": "01:56:59",
+   "facecam": [
+    0,
+    0,
+    284,
+    200
+   ],
+   "hook": "ANYME DÉCOUVRE LE FENWICK DANS GTA VI",
+   "zooms": [
+    "01:55:58",
+    "01:56:34"
+   ],
+   "impacts": [
+    "01:56:34"
+   ]
+  },
+  {
+   "name": "06_conduite",
+   "start": "02:07:12",
+   "end": "02:08:52",
+   "facecam": [
+    0,
+    36,
+    284,
+    200
+   ],
+   "hook": "SON AVIS CASH SUR LA CONDUITE DANS GTA VI",
+   "zooms": [
+    "02:07:25",
+    "02:08:45"
+   ]
+  }
+ ]
+}

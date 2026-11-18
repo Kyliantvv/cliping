@@ -25,6 +25,7 @@ Règles à appliquer à tous les prochains clips.
    - Ne jamais reprendre le logo officiel GTA VI ni l'habillage Rockstar : le compte ne doit pas avoir l'air officiel.
    - **Appliqué automatiquement par `render.py`** (police dans `assets/fonts/`).
 5. **Sous-titres karaoké** : chaque mot s'allume en rose quand il est prononcé, mots-clés en turquoise.
+   Toujours lancer `python tools/check_sync.py clips/<video>.json` après le rendu : pas de publication si A VERIFIER sans avoir regardé.
 6. **Jump cuts sur les streams** : `"jumpcut": true` retire les blancs et respirations de plus de 0,4 s.
    Ça n'a aucun effet sur les vidéos avec une musique de fond continue, et c'est voulu : couper par-dessus la musique s'entendrait.
    Penser aux 60 s : les jump cuts raccourcissent le clip.

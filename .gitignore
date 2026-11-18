@@ -1,7 +1,7 @@
 # Videos sources, travail et rendus : trop lourds pour GitHub (>100 Mo) et contenu de tiers
 input/
 work/
-output/*.mp4
+output/**/*.mp4
 *.part
 *.parts/
 # Modeles (500+ Mo) : voir README

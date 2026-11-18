@@ -283,6 +283,68 @@ def make_banner(lines, path):
     return bw, bh
 
 
+class VoiceMask:
+    """Activite vocale (trames de 20 ms) sur [start, end] de la source, meme seuil que les jump cuts."""
+
+    HOP = 0.02
+
+    def __init__(self, wav_path, start, end):
+        self.t0, self.on = start, np.zeros(0, bool)
+        if not os.path.exists(wav_path):
+            return
+        with wave.open(wav_path, "rb") as w:
+            sr = w.getframerate()
+            w.setpos(int(max(0, start) * sr))
+            data = np.frombuffer(w.readframes(int((end - start) * sr)), dtype=np.int16).astype(np.float32) / 32768
+        hop = int(sr * self.HOP)
+        nf = len(data) // hop
+        if nf < 10:
+            return
+        db = 20 * np.log10(np.sqrt(np.mean(data[: nf * hop].reshape(nf, hop) ** 2, axis=1)) + 1e-9)
+        thr = max(-50.0, min(-30.0, np.percentile(db, 90) - 22))
+        on = db >= thr
+        # bouche les micro-trous (< 100 ms) entre deux syllabes
+        k = 5
+        for i in range(1, len(on) - 1):
+            if not on[i] and on[max(0, i - k):i].any() and on[i + 1:i + 1 + k].any():
+                on[i] = True
+        self.on = on
+
+    def frames(self, a, b):
+        i = max(0, int((a - self.t0) / self.HOP))
+        j = min(len(self.on), int((b - self.t0) / self.HOP))
+        return i, j
+
+
+def align_words(text, s, e, vm, prev_end=-1e9, next_start=1e9):
+    """Mots du segment [s, e] places sur les moments ou la voix est vraiment presente.
+
+    Whisper donne des segments approximatifs (debut/fin souvent dans un blanc) : on resserre le segment
+    sur la voix detectee, puis on repartit les mots sur le temps parle uniquement (pas sur les pauses).
+    """
+    words = text.split()
+    if vm is None or not len(vm.on) or not words:
+        return word_times(text, s, e)
+    lo, hi = max(s - 0.3, prev_end), min(e + 0.3, next_start)
+    i, j = vm.frames(lo, hi)
+    idx = np.nonzero(vm.on[i:j])[0]
+    if len(idx) < 3:
+        return word_times(text, s, e)
+    ts = vm.t0 + (i + idx) * vm.HOP  # instants voises
+    # resserre sur la voix mais garde le segment ancre (pas plus de 0.3 s de deplacement par bord sans voix)
+    ts = ts[(ts >= s - 0.3) & (ts <= e + 0.3)]
+    if len(ts) < 3:
+        return word_times(text, s, e)
+    weights = np.array([len(w) + 1 for w in words], float)
+    cum = np.concatenate([[0], np.cumsum(weights)]) / weights.sum() * (len(ts) - 1)
+    out = []
+    for k, w in enumerate(words):
+        a = ts[int(round(cum[k]))]
+        b = ts[min(len(ts) - 1, int(round(cum[k + 1])))] + vm.HOP
+        out.append((w, a, max(b, a + 0.08)))
+    return out
+
+
 def word_times(text, s, e):
     """Decoupe un segment en mots avec des temps proportionnels a leur longueur."""
     words = text.split()
@@ -298,7 +360,7 @@ def word_times(text, s, e):
     return out
 
 
-def build_ass(clip, caps, tl, cfg, path, hook_lines):
+def build_ass(clip, caps, tl, cfg, path, hook_lines, vm=None):
     layout = cfg.get("layout", "blur")
     cam_h = cfg.get("cam_height", 640)
     hl = [h.lower() for h in DEFAULT_HL + cfg.get("highlight", []) + clip.get("highlight", [])]
@@ -337,14 +399,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   r"{\fscx60\fscy60\t(0,150,\fscx100\fscy100)}" + esc(clip["outro"].upper()))
 
     karaoke = clip.get("karaoke", cfg.get("karaoke", True))
-    for c in caps:
+    caps = [c for c in caps if c["end"] / 1000.0 > tl.start and c["start"] / 1000.0 < tl.end]
+    for ci, c in enumerate(caps):
         s, e = c["start"] / 1000.0, c["end"] / 1000.0
-        if e <= tl.start or s >= tl.end:
-            continue
         text = esc(fix_text(c["text"].strip(), cfg).upper())
         if not text:
             continue
-        words = word_times(text, s, e)
+        prev_e = caps[ci - 1]["end"] / 1000.0 if ci else -1e9
+        next_s = caps[ci + 1]["start"] / 1000.0 if ci + 1 < len(caps) else 1e9
+        words = align_words(text, s, e, vm, prev_e - 0.1, next_s + 0.1)
+        # chaque mot reste affiche jusqu'au suivant (pas de clignotement), la ligne jusqu'a la fin de la voix + 0.3 s
+        words = [(w, a, max(b, words[k + 1][1]) if k + 1 < len(words) and words[k + 1][1] - b < 0.6 else b)
+                 for k, (w, a, b) in enumerate(words)]
+        s, e = words[0][1], min(words[-1][2] + 0.3, next_s)
         # mots-cles en turquoise
         base = [hl_re.sub(lambda m: f"{{\\c{TURQUOISE}&}}" + m.group(0) + f"{{\\c{WHITE}&}}", w) for w, _, _ in words]
         if not karaoke:
@@ -356,7 +423,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         first = True
         for i, (w, ws, we) in enumerate(words):
             if i == len(words) - 1:
-                we = e
+                we = max(we, e)
             rng = tl.map_range(ws, we)
             if not rng:
                 continue
@@ -447,7 +514,8 @@ def render(cfg, clip, enc):
     os.makedirs(out_dir, exist_ok=True)
 
     hook_lines = wrap(clip["hook"].upper(), HOOK_CHARS) if clip.get("hook") else []
-    hd = build_ass(clip, caps, tl, cfg, os.path.join(tmp, f"{name}.ass"), hook_lines)
+    vm = VoiceMask(os.path.join(ROOT, os.path.dirname(cfg["captions"]), "audio.wav"), max(0, start - 2), end + 2)         if cfg.get("captions") else None
+    hd = build_ass(clip, caps, tl, cfg, os.path.join(tmp, f"{name}.ass"), hook_lines, vm)
     od = float(clip.get("outro_duration", 2.5)) if clip.get("outro") else 0.0
     total = tl.duration + od
 

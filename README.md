@@ -33,6 +33,11 @@ Règles de montage : voir [PREFERENCES.md](PREFERENCES.md).
    python tools/render.py clips/ma_video.json
    python tools/render.py clips/ma_video.json --only 03_crash
    ```
+6. Vérification de la synchro sous-titres / voix (sur les mp4 rendus) :
+   ```
+   python tools/check_sync.py clips/ma_video.json
+   ```
+   Verdict OK / A VERIFIER par clip + image `work/_render/<clip>_sync.png` (gris = voix, couleurs = mots).
 
 ## Signaux utilisés pour trouver les moments
 | Signal | Outil | Pour quoi |
@@ -48,7 +53,7 @@ Règles de montage : voir [PREFERENCES.md](PREFERENCES.md).
 - Début et fin calés sur des phrases complètes, puis sur un changement de plan proche s'il tombe dans un silence.
 - `cuts` : passages retirés à l'intérieur d'un clip ; les sous-titres et les zooms sont recalés.
 - `jumpcut` : retire les blancs et les respirations (pour les streams).
-- Sous-titres karaoké mot par mot, DA néon façon Vice City (Montserrat, bandeau dégradé), voir PREFERENCES.md.
+- Sous-titres karaoké mot par mot, chaque mot calé sur la voix réellement détectée, DA néon façon Vice City (Montserrat, bandeau dégradé), voir PREFERENCES.md.
 - Bruitages (whoosh sur les zooms, impact sur le hook et sur `impacts`) et musique synthwave originale qui baisse sous la voix.
 - `"facecam": "auto"` : détection de la facecam (visage fixe + bords du cadre), contrôle dans `facecam_check.jpg`.
 - Hook affiché au moins 6 s, écran de fin optionnel (`outro`), son à -14 LUFS, encodage NVENC.

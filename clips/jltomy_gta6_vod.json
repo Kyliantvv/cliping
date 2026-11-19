@@ -1,0 +1,98 @@
+{
+ "source": "input/jltomy_gta6_vod.mp4",
+ "captions": "work/jltomy_gta6_vod/captions.json",
+ "creator": "JLTomy",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [
+  20,
+  298,
+  280,
+  156
+ ],
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "gocar": "coquard",
+  "cocard": "coquard",
+  "ro-dave": "rodave"
+ },
+ "highlight": [
+  "gta",
+  "tigre",
+  "flics",
+  "coquard",
+  "dollars"
+ ],
+ "clips": [
+  {
+   "name": "01_coquard",
+   "start": "04:56:28",
+   "end": "04:57:58",
+   "hook": "IL SE PREND UN COQUARD DANS GTA VI",
+   "zooms": [
+    "04:57:16"
+   ],
+   "impacts": [
+    "04:57:09"
+   ]
+  },
+  {
+   "name": "02_tigre",
+   "start": "03:51:20",
+   "end": "03:53:22",
+   "hook": "UN TIGRE DÉBARQUE EN PLEIN CONTRÔLE DE POLICE",
+   "zooms": [
+    "03:51:55",
+    "03:52:33"
+   ],
+   "impacts": [
+    "03:52:09"
+   ],
+   "cuts": [
+    [
+     "03:52:36.5",
+     "03:52:41"
+    ]
+   ]
+  },
+  {
+   "name": "03_flics",
+   "start": "00:56:27",
+   "end": "00:58:29",
+   "hook": "LA PLANQUE PARFAITE CONTRE LES FLICS DANS GTA VI",
+   "zooms": [
+    "00:58:14",
+    "00:58:26"
+   ]
+  },
+  {
+   "name": "04_betises",
+   "start": "01:19:00",
+   "end": "01:20:52.3",
+   "hook": "IL VOLE SA PROPRE VOITURE À LA FOURRIÈRE",
+   "zooms": [
+    "01:20:33"
+   ],
+   "impacts": [
+    "01:20:51"
+   ]
+  },
+  {
+   "name": "05_braquage",
+   "start": "01:28:20",
+   "end": "01:30:28",
+   "hook": "IL BRAQUE UNE BOUTIQUE POUR 5 DOLLARS",
+   "zooms": [
+    "01:29:09",
+    "01:29:44"
+   ],
+   "cuts": [
+    [
+     "01:28:46.5",
+     "01:28:54.5"
+    ]
+   ]
+  }
+ ]
+}

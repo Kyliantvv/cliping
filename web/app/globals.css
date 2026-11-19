@@ -285,6 +285,7 @@ dialog::backdrop { background: rgba(5, 2, 10, 0.72); backdrop-filter: blur(4px);
 .qr-steps { padding-left: 20px; margin: 16px 0 8px; color: var(--muted); }
 .qr-steps li { margin-bottom: 4px; }
 .qr-steps b { color: var(--text); }
+.qr-steps.howto { margin-top: 8px; padding: 12px 12px 12px 30px; background: var(--bg); border-radius: var(--r-sm); font-size: 13px; }
 .qr-url { font-family: ui-monospace, Consolas, monospace; word-break: break-all; opacity: 0.7; }
 
 /* ---------- toasts ---------- */

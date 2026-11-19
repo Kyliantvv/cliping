@@ -20,6 +20,8 @@ Règles à appliquer à tous les prochains clips.
      - turquoise `#19D3C5`
      - texte blanc, contour sombre `#1A0B2E`
    - Hook : texte blanc sur un bandeau en dégradé rose → orange (à la place de l'encadré blanc).
+     **Bandeau compact** (demandé le 19/11) : texte 60 px, 22 caractères par ligne, 2 lignes max si possible.
+     Ne pas revenir au gros bandeau de 80 px qui cachait la facecam.
    - Mots-clés des sous-titres : rose néon ou turquoise, à la place du jaune.
    - Écran de fin : fond violet, texte blanc.
    - Ne jamais reprendre le logo officiel GTA VI ni l'habillage Rockstar : le compte ne doit pas avoir l'air officiel.

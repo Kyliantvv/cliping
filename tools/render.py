@@ -68,8 +68,8 @@ FIXES = {
 }
 
 END_PUNCT = (".", "!", "?", "…")
-HOOK_SIZE = 80
-HOOK_CHARS = 18  # caracteres max par ligne du hook
+HOOK_SIZE = 60  # reduit le 19/11 (bandeau trop gros)
+HOOK_CHARS = 22  # caracteres max par ligne du hook
 
 
 # ------------------------------------------------------------------ utilitaires
@@ -272,8 +272,8 @@ def caption_margin(layout, cam_h):
 def make_banner(lines, path):
     """Bandeau degrade rose -> orange a coins arrondis, taille adaptee au texte du hook."""
     longest = max(len(l) for l in lines)
-    bw = min(W - 60, max(520, int(longest * HOOK_SIZE * 0.6) + 110))
-    bh = len(lines) * int(HOOK_SIZE * 1.2) + 60
+    bw = min(W - 60, max(420, int(longest * HOOK_SIZE * 0.6) + 80))
+    bh = len(lines) * int(HOOK_SIZE * 1.2) + 40
     r = 30
     (r1, g1, b1), (r2, g2, b2) = GRAD_A, GRAD_B
     alpha = (f"255*lte(pow(max(max({r}-X\\,X-(W-1-{r}))\\,0)\\,2)+pow(max(max({r}-Y\\,Y-(H-1-{r}))\\,0)\\,2)\\,{r * r})")

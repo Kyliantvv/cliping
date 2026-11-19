@@ -1,0 +1,62 @@
+{
+ "layout": "split",
+ "cam_height": 640,
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI"
+ },
+ "source": "input/antoinedaniel_gta6_j1.mp4",
+ "captions": "work/antoinedaniel_gta6_j1/captions.json",
+ "facecam": [
+  1000,
+  520,
+  280,
+  200
+ ],
+ "highlight": [
+  "gta",
+  "vice city"
+ ],
+ "clips": [
+  {
+   "name": "01_decompte",
+   "start": "00:58:31",
+   "end": "01:00:02",
+   "hook": "LE DÉCOMPTE D'ANTOINE DANIEL AVANT GTA VI",
+   "zooms": [
+    "00:59:43"
+   ],
+   "impacts": [
+    "00:59:47"
+   ]
+  },
+  {
+   "name": "02_emerveille",
+   "start": "01:08:01",
+   "end": "01:09:58",
+   "hook": "ANTOINE DANIEL ÉMERVEILLÉ PAR LES DÉTAILS DE GTA VI",
+   "zooms": [
+    "01:08:44"
+   ]
+  },
+  {
+   "name": "03_c_etait_quoi",
+   "start": "01:34:28",
+   "end": "01:35:52",
+   "facecam": [
+    1040,
+    0,
+    240,
+    230
+   ],
+   "hook": "MORT EN UNE SECONDE DANS SA PREMIÈRE FUSILLADE",
+   "zooms": [
+    "01:35:23"
+   ],
+   "impacts": [
+    "01:35:23"
+   ],
+   "outro": "Abonne-toi pour la suite"
+  }
+ ]
+}

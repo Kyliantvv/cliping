@@ -7,7 +7,7 @@ Règles de montage : voir [PREFERENCES.md](PREFERENCES.md).
 - `input/` : vidéos/streams sources (.mp4)
 - `work/<video>/` : transcription, signaux, planches d'aperçu
 - `clips/<video>.json` : liste des clips (début, fin, hook, zooms, coupes)
-- `output/` : clips TikTok finis 1080x1920 + `legendes.txt`
+- `output/<video>/` : clips TikTok finis 1080x1920 + `legendes.txt` (un dossier par vidéo source)
 - `models/` : Whisper, YAMNet
 
 ## Étapes
@@ -74,4 +74,7 @@ Règles de montage : voir [PREFERENCES.md](PREFERENCES.md).
 - Mettre dans `models/` : `ggml-large-v3-turbo-q5_0.bin` (whisper.cpp), `yamnet.onnx` + `yamnet_class_map.csv`
   (zeropointnine/yamnet-onnx), `ultraface-RFB-320.onnx` (Linzaer/Ultra-Light-Fast-Generic-Face-Detector).
 - Les dossiers `input/`, `work/`, `models/` et les mp4 de `output/` ne sont pas versionnés.
-- VOD Twitch (même en live) : `python tools/twitch_vod.py https://www.twitch.tv/videos/ID input/nom.mp4`
+- VOD Twitch (même en live) : `python tools/twitch_vod.py https://www.twitch.tv/videos/ID input/nom.mp4 [--start 8:15:00]`
+  (`--start` : seulement la fin d'un long stream ; le chat est recalé via `input/nom.meta.json`).
+- VOD réservée aux abonnés : enregistrer le live public avec yt-dlp (`python -m yt_dlp --hls-use-mpegts -o input/nom.ts https://www.twitch.tv/chaine`),
+  puis remuxer en mp4 et écrire `input/nom.meta.json` avec `vod_start` (secondes de VOD au début de l'enregistrement).

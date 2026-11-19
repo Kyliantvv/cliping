@@ -1,0 +1,71 @@
+{
+ "source": "input/jltomy_gta6_j1.mp4",
+ "captions": "work/jltomy_gta6_j1/captions.json",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [
+  20,
+  298,
+  280,
+  156
+ ],
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "Zabby": "Zabbi",
+  "sgag": "schlag"
+ },
+ "highlight": [
+  "gta",
+  "chat",
+  "flics"
+ ],
+ "clips": [
+  {
+   "name": "01_appels_de_phare",
+   "start": "00:21:25",
+   "end": "00:22:44",
+   "hook": "IL PREND DES APPELS DE PHARE POUR DES INSULTES",
+   "zooms": [
+    "00:21:57"
+   ]
+  },
+  {
+   "name": "02_chat_backseat",
+   "start": "00:24:03",
+   "end": "00:25:20",
+   "hook": "LE CHAT NE LE LAISSE PAS JOUER À GTA VI",
+   "zooms": [
+    "00:24:57",
+    "00:25:12"
+   ],
+   "impacts": [
+    "00:25:00"
+   ]
+  },
+  {
+   "name": "03_muscu",
+   "start": "00:42:15",
+   "end": "00:43:52",
+   "hook": "JLTOMY RATE SA SÉANCE DE MUSCU DANS GTA VI",
+   "zooms": [
+    "00:42:38",
+    "00:43:18"
+   ]
+  },
+  {
+   "name": "04_premiere_bagarre",
+   "start": "00:53:55",
+   "end": "00:55:24",
+   "hook": "SA PREMIÈRE BAGARRE DANS GTA VI TOURNE MAL",
+   "zooms": [
+    "00:54:03",
+    "00:55:16"
+   ],
+   "impacts": [
+    "00:54:33"
+   ],
+   "outro": "Abonne-toi pour la suite"
+  }
+ ]
+}

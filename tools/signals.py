@@ -148,7 +148,7 @@ def _gql(query):
     raise SystemExit("Twitch ne repond pas")
 
 
-def _download_twitch_chat(url):
+def _download_twitch_chat(url, start=0, end=None):
     """Replay du chat d'une VOD Twitch via l'API publique du site (pagination par curseur)."""
     m = re.search(r"videos/(\d+)", url) or re.fullmatch(r"(\d+)", url)
     if not m:
@@ -156,7 +156,7 @@ def _download_twitch_chat(url):
     vid = m.group(1)
     print("Telechargement du chat Twitch...")
     # la pagination par curseur est refusee sans jeton : on avance par decalage (secondes) et on dedoublonne
-    msgs, seen, offset, last_print = [], set(), 0, 0
+    msgs, seen, offset, last_print = [], set(), int(start), int(start)
     while True:
         q = ('{ video(id:"%s") { comments(contentOffsetSeconds:%d) { edges { node { id contentOffsetSeconds '
              'message { fragments { text } } } } pageInfo { hasNextPage } } } }') % (vid, offset)
@@ -175,6 +175,8 @@ def _download_twitch_chat(url):
             msgs.append((float(n["contentOffsetSeconds"]), text))
         if not edges or not data["comments"]["pageInfo"]["hasNextPage"]:
             break
+        if end is not None and msgs and msgs[-1][0] > end:
+            break
         last = int(edges[-1]["node"]["contentOffsetSeconds"])
         offset = last if (new and last > offset) else offset + 1
         if msgs and msgs[-1][0] - last_print > 600:
@@ -183,14 +185,15 @@ def _download_twitch_chat(url):
     return msgs
 
 
-def chat(source, out_dir):
-    """Telecharge (URL) ou lit (fichier) le chat -> chat.json [[t, message]]."""
+def chat(source, out_dir, start=0.0, end=None):
+    """Telecharge (URL) ou lit (fichier) le chat -> chat.json [[t, message]].
+    start/end : partie de la VOD contenue dans la video (temps ramenes au debut de la video)."""
     path = os.path.join(out_dir, "chat.json")
     if os.path.exists(source):
         msgs = _load_chat_file(source)
     else:
-        msgs = _download_twitch_chat(source)
-    msgs.sort()
+        msgs = _download_twitch_chat(source, start, end)
+    msgs = sorted((t - start, m) for t, m in msgs if t >= start and (end is None or t <= end))
     with open(path, "w", encoding="utf-8") as f:
         json.dump(msgs, f, ensure_ascii=False)
     print(f"{len(msgs)} messages de chat")

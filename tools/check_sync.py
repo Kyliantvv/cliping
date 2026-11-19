@@ -107,8 +107,8 @@ def draw(words, on, db, path, title):
     os.remove(raw)
 
 
-def check(name):
-    mp4 = os.path.join(ROOT, "output", f"{name}.mp4")
+def check(name, sub=""):
+    mp4 = os.path.join(ROOT, "output", sub, f"{name}.mp4")
     ass = os.path.join(ROOT, "work", "_render", f"{name}.ass")
     if not (os.path.exists(mp4) and os.path.exists(ass)):
         print(f"{name}: pas encore rendu")
@@ -160,7 +160,8 @@ def main():
     args = ap.parse_args()
     with open(args.config, encoding="utf-8") as f:
         cfg = json.load(f)
-    res = [check(c["name"]) for c in cfg["clips"] if not args.only or c["name"] == args.only]
+    sub = os.path.splitext(os.path.basename(cfg["source"]))[0]
+    res = [check(c["name"], sub) for c in cfg["clips"] if not args.only or c["name"] == args.only]
     res = [r for r in res if r is not None]
     print(f"\n{sum(res)}/{len(res)} clips OK. Images de controle : work/_render/<nom>_sync.png "
           "(gris clair = voix, couleurs = mot surligne)")

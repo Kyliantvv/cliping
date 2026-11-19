@@ -1,0 +1,71 @@
+{
+ "layout": "split",
+ "cam_height": 640,
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI"
+ },
+ "source": "input/michou_gta6_j1.mp4",
+ "captions": "work/michou_gta6_j1/captions.json",
+ "facecam": [
+  4,
+  14,
+  300,
+  168
+ ],
+ "highlight": [
+  "gta",
+  "lucia",
+  "play",
+  "son"
+ ],
+ "clips": [
+  {
+   "name": "01_echo_eglise",
+   "start": "00:34:21",
+   "end": "00:36:33",
+   "facecam": [
+    18,
+    128,
+    302,
+    168
+   ],
+   "hook": "MICHOU PARLE DANS UNE ÉGLISE 1H AVANT GTA VI",
+   "zooms": [
+    "00:35:52",
+    "00:36:08"
+   ]
+  },
+  {
+   "name": "02_decompte",
+   "start": "01:57:05",
+   "end": "01:58:37",
+   "hook": "MICHOU LANCE GTA VI À MINUIT PILE",
+   "zooms": [
+    "01:57:51"
+   ],
+   "impacts": [
+    "01:57:52"
+   ]
+  },
+  {
+   "name": "03_premieres_impressions",
+   "start": "02:04:01",
+   "end": "02:05:47",
+   "hook": "PREMIÈRES IMPRESSIONS DE MICHOU SUR GTA VI",
+   "zooms": [
+    "02:05:01"
+   ]
+  },
+  {
+   "name": "04_gta_rp",
+   "start": "02:08:03",
+   "end": "02:09:37",
+   "hook": "MICHOU SE CROIT SUR GTA RP",
+   "zooms": [
+    "02:09:17"
+   ],
+   "outro": "Abonne-toi pour la suite"
+  }
+ ]
+}

@@ -126,7 +126,9 @@ def main():
     wav = os.path.join(out, "audio.wav")
     if not os.path.exists(wav):
         print("Extraction audio...")
-        run(["ffmpeg", "-y", "-v", "error", "-i", video, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav])
+        # aresample async : le wav reste cale sur l'horloge de la video meme s'il y a des trous dans le son
+        run(["ffmpeg", "-y", "-v", "error", "-i", video, "-vn", "-af", "aresample=async=1:first_pts=0",
+             "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav])
 
     # 2. image pour reperer la facecam
     run(["ffmpeg", "-y", "-v", "error", "-ss", str(dur * 0.5), "-i", video, "-frames:v", "1", "-q:v", "3",
@@ -191,7 +193,9 @@ def main():
     print(f"{len(sc['cuts'])} changements de plan, {len(sc['black'])} passages noirs")
     msgs = []
     if args.chat:
-        msgs = signals.chat(args.chat, out)
+        meta = os.path.splitext(video)[0] + ".meta.json"  # VOD partielle : recale le chat
+        vs = json.load(open(meta, encoding="utf-8"))["vod_start"] if os.path.exists(meta) else 0.0
+        msgs = signals.chat(args.chat, out, vs, vs + dur)
     elif os.path.exists(os.path.join(out, "chat.json")):
         with open(os.path.join(out, "chat.json"), encoding="utf-8") as f:
             msgs = json.load(f)

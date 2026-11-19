@@ -367,7 +367,14 @@ def send_to_iphone(key, vid):
         raise FileNotFoundError("dossier iCloud Photos introuvable")
     sub, name = key.split("/", 1)
     dst = os.path.join(d, f"{sub}_{name}.mp4")
-    shutil.copyfile(vid, dst + ".part")  # .part : iCloud n'envoie pas un fichier a moitie copie
+    # copie sans re-encodage + date de creation = maintenant : sans elle, Photos (iPhone) classe la video
+    # a une date au hasard et on ne la trouve pas en haut de la galerie
+    now = time.strftime("%Y-%m-%dT%H:%M:%S.000000Z", time.gmtime())
+    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", vid, "-map", "0", "-c", "copy",
+                        "-metadata", f"creation_time={now}", "-movflags", "+faststart", "-f", "mp4", dst + ".part"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:  # secours : simple copie
+        shutil.copyfile(vid, dst + ".part")  # .part : iCloud n'envoie pas un fichier a moitie copie
     os.replace(dst + ".part", dst)
     with _lock:
         state = load_json(STATE, {})

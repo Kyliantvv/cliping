@@ -10,7 +10,10 @@ Ce qu'elle fait :
   - suivi de publication : a poster / programme / poste, lien TikTok, vues, likes, notes
   - modifier le hook ou les bornes d'un clip et le re-rendre (+ verification de synchro) depuis l'appli
   - file d'attente de publication : le prochain clip a poster selon l'ordre conseille
-Etat de suivi : data/state.json (pas de base de donnees).
+  - envoi d'un clip vers l'iPhone : copie dans le dossier iCloud Photos (iCloud pour Windows)
+  - nouveau stream : lien Twitch -> telechargement + analyse en arriere-plan -> moments proposes,
+    on coche, on ecrit le hook, on trace la facecam -> config + legendes + rendus
+Etat : data/state.json, data/settings.json, data/projects.json (pas de base de donnees).
 """
 import argparse
 import json
@@ -18,10 +21,12 @@ import mimetypes
 import os
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
 import time
+import unicodedata
 import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,11 +36,14 @@ WEB = os.path.join(ROOT, "tools", "app_web")
 STATE = os.path.join(ROOT, "data", "state.json")
 THUMBS = os.path.join(ROOT, "work", "_thumbs")
 SYNC = os.path.join(ROOT, "work", "_render", "sync.json")
+SETTINGS = os.path.join(ROOT, "data", "settings.json")
+PROJECTS = os.path.join(ROOT, "data", "projects.json")
 PY = sys.executable
 
 _lock = threading.Lock()
 _jobs = []          # [{id, key, kind, status, log, started, ended}]
-_job_q = queue.Queue()
+_job_q = queue.Queue()      # rendus
+_import_q = queue.Queue()   # telechargement + analyse de streams
 _dur_cache = {}
 
 
@@ -181,40 +189,324 @@ def all_clips():
                 "sync": sync.get(key) or sync.get(name),
                 "status": st.get("status", "a_poster"), "url": st.get("url", ""), "views": st.get("views"),
                 "likes": st.get("likes"), "notes": st.get("notes", ""), "posted_at": st.get("posted_at"),
-                "scheduled": st.get("scheduled", ""), "job": jobs_by_key.get(key),
+                "scheduled": st.get("scheduled", ""), "sent_at": st.get("sent_at"), "job": jobs_by_key.get(key),
             })
     return out
 
 
-# ------------------------------------------------------------------ rendus en arriere-plan
-def worker():
+# ------------------------------------------------------------------ taches en arriere-plan
+# deux files : les rendus (1 a 2 min) ne restent pas bloques derriere un import de stream (30 min et +)
+def _log(job, text):
+    job["log"] = (job["log"] + text)[-6000:]
+
+
+def run_cmd(job, cmd):
+    """Lance une commande, recopie sa sortie dans le log du job au fil de l'eau."""
+    _log(job, "\n$ " + " ".join(os.path.basename(c) if i < 2 else c for i, c in enumerate(cmd)) + "\n")
+    p = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                         encoding="utf-8", errors="replace", env={**os.environ, "PYTHONUNBUFFERED": "1"})
+    out = []
+    for line in p.stdout:
+        out.append(line)
+        _log(job, line)
+    p.wait()
+    if p.returncode != 0 or any(l.startswith("ECHEC") for l in out):
+        raise RuntimeError(f"echec de {os.path.basename(cmd[1])}")
+
+
+def worker(q):
     while True:
-        job = _job_q.get()
+        job = q.get()
         job["status"], job["started"] = "en cours", time.time()
-        cfg_path = os.path.join("clips", job["config"])
-        name = job["key"].split("/", 1)[1]
-        log = []
-        ok = True
-        for cmd in ([PY, "tools/render.py", cfg_path, "--only", name],
-                    [PY, "tools/check_sync.py", cfg_path, "--only", name]):
-            p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
-            log.append((p.stdout or "")[-1500:] + (p.stderr or "")[-1500:])
-            if p.returncode != 0 or "ECHEC" in (p.stdout or ""):
-                ok = False
-                break
-        job["log"] = "\n".join(log)
-        job["status"] = "fini" if ok else "erreur"
+        try:
+            for step in job.pop("_steps"):
+                if callable(step):
+                    step(job)
+                else:
+                    run_cmd(job, step)
+            job["status"] = "fini"
+        except Exception as e:  # noqa: BLE001 - toute erreur doit finir dans le log, pas tuer le worker
+            _log(job, f"\nERREUR : {e}\n")
+            job["status"] = "erreur"
         job["ended"] = time.time()
 
 
-def queue_render(config, key):
-    job = {"id": int(time.time() * 1000), "key": key, "config": config, "status": "en attente", "log": "",
-           "started": None, "ended": None}
+def add_job(q, kind, key, steps, **extra):
+    job = {"id": int(time.time() * 1000), "kind": kind, "key": key, "status": "en attente", "log": "",
+           "started": None, "ended": None, "_steps": steps, **extra}
     with _lock:
         _jobs.append(job)
-        del _jobs[:-30]
-    _job_q.put(job)
-    return job
+        del _jobs[:-40]
+    q.put(job)
+    return public_job(job)
+
+
+def public_job(job):
+    return {k: v for k, v in job.items() if not k.startswith("_")}
+
+
+def queue_render(config, key):
+    cfg_path = os.path.join("clips", config)
+    name = key.split("/", 1)[1]
+    return add_job(_job_q, "render", key, [[PY, "tools/render.py", cfg_path, "--only", name],
+                                           [PY, "tools/check_sync.py", cfg_path, "--only", name]], config=config)
+
+
+# ------------------------------------------------------------------ envoi vers l'iPhone (iCloud Photos)
+def settings():
+    return load_json(SETTINGS, {})
+
+
+def icloud_candidates():
+    """Dossiers ou iCloud pour Windows envoie les fichiers vers Photos (selon la version)."""
+    home = os.path.expanduser("~")
+    c = [os.path.join(home, "Pictures", "iCloud Photos", "Uploads"),
+         os.path.join(home, "Pictures", "iCloud Photos"),
+         os.path.join(home, "iCloud Photos", "Uploads"),
+         os.path.join(home, "iCloudPhotos", "Uploads"),
+         os.path.join(home, "iCloudPhotos")]
+    return [p for p in c if os.path.isdir(p)]
+
+
+def iphone_dir():
+    d = settings().get("iphone_dir")
+    if d and os.path.isdir(d):
+        return d
+    found = icloud_candidates()
+    return found[0] if found else None
+
+
+def send_to_iphone(key, vid):
+    d = iphone_dir()
+    if not d:
+        raise FileNotFoundError("dossier iCloud Photos introuvable")
+    sub, name = key.split("/", 1)
+    dst = os.path.join(d, f"{sub}_{name}.mp4")
+    shutil.copyfile(vid, dst + ".part")  # .part : iCloud n'envoie pas un fichier a moitie copie
+    os.replace(dst + ".part", dst)
+    with _lock:
+        state = load_json(STATE, {})
+        state.setdefault(key, {})["sent_at"] = time.strftime("%Y-%m-%d %H:%M")
+        save_json(STATE, state)
+    return dst
+
+
+# ------------------------------------------------------------------ nouveaux streams : import, moments, creation
+def slug(s, n=40):
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "_", s).strip("_")[:n].strip("_")
+
+
+def fmt(t):
+    t = max(0, int(round(t)))
+    return f"{t // 3600:02d}:{t % 3600 // 60:02d}:{t % 60:02d}"
+
+
+def projects_meta():
+    return load_json(PROJECTS, {})
+
+
+def resolve_twitch(url):
+    """Lien de chaine -> derniere VOD (live en cours compris). Lien de VOD -> tel quel."""
+    url = url.strip()
+    if re.search(r"twitch\.tv/videos/\d+", url):
+        return url, None
+    m = re.search(r"twitch\.tv/([A-Za-z0-9_]+)/?$", url)
+    if not m:
+        raise ValueError("lien Twitch attendu : twitch.tv/videos/123... ou twitch.tv/chaine")
+    login = m.group(1)
+    r = subprocess.run([PY, "-m", "yt_dlp", "--flat-playlist", "--playlist-items", "1", "--print", "url",
+                        f"https://www.twitch.tv/{login}/videos?filter=archives&sort=time"],
+                       capture_output=True, text=True, timeout=120)
+    vod = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
+    if "/videos/" not in vod:
+        raise ValueError(f"aucune VOD publique trouvee pour {login}")
+    return vod, login
+
+
+def start_import(data):
+    name = slug(data.get("name") or "", 50)
+    creator = (data.get("creator") or "").strip()
+    url = (data.get("url") or "").strip()
+    if not name:
+        raise ValueError("nom de projet manquant")
+    if not creator:
+        raise ValueError("nom du streamer manquant")
+    if any(j["kind"] == "import" and j["key"] == name and j["status"] in ("en attente", "en cours") for j in _jobs):
+        raise ValueError("import deja en cours pour ce projet")
+    video = os.path.join("input", name + ".mp4")
+    have_video = os.path.exists(os.path.join(ROOT, video))
+    if not have_video and not url:
+        raise ValueError("lien Twitch manquant (ou mettre input/" + name + ".mp4)")
+    if url and not re.search(r"twitch\.tv/(videos/\d+|[A-Za-z0-9_]+/?$)", url):
+        raise ValueError("lien Twitch attendu : twitch.tv/videos/123... ou twitch.tv/chaine")
+    for k in ("start", "end"):
+        if data.get(k):
+            tsec(data[k])  # leve ValueError si invalide
+    with _lock:
+        meta = projects_meta()
+        meta[name] = {**meta.get(name, {}), "creator": creator, "url": url, "created": time.strftime("%Y-%m-%d %H:%M")}
+        save_json(PROJECTS, meta)
+
+    def resolve(job):
+        if not url:
+            return
+        vod, login = resolve_twitch(url)
+        job["vod"] = vod
+        _log(job, f"VOD : {vod}\n")
+        with _lock:
+            meta = projects_meta()
+            meta[name]["vod"] = vod
+            if login:
+                meta[name]["channel"] = f"twitch.tv/{login}"
+            save_json(PROJECTS, meta)
+
+    def download(job):
+        if have_video:
+            _log(job, f"{video} deja present : pas de telechargement\n")
+            return
+        cmd = [PY, "tools/twitch_vod.py", job["vod"], video]
+        for k in ("start", "end"):
+            if data.get(k):
+                cmd += [f"--{k}", str(data[k])]
+        run_cmd(job, cmd)
+
+    def analyze(job):
+        cmd = [PY, "tools/analyze.py", video]
+        if job.get("vod"):
+            cmd += ["--chat", job["vod"]]
+        run_cmd(job, cmd)
+
+    return add_job(_import_q, "import", name, [resolve, download, analyze])
+
+
+def parse_candidates(name):
+    path = os.path.join(ROOT, "work", name, "candidates.txt")
+    out = []
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    for i, l in enumerate(lines):
+        m = re.match(r"#(\d+)\s+pic (\S+)\s+fenetre (\S+) -> (\S+)\s+score ([\d.]+)\s+\[(.*)\]", l)
+        if m:
+            peak = tsec(m.group(2))
+            text = lines[i + 1].strip() if i + 1 < len(lines) else ""
+            why = [w.strip() for w in m.group(6).split("|") if w.strip() and w.strip() != "-"]
+            # clip propose : ~65 s autour du pic (le rendu recale debut/fin sur des phrases completes)
+            out.append({"rank": int(m.group(1)), "peak": fmt(peak), "score": float(m.group(5)), "why": why,
+                        "text": text, "start": fmt(peak - 35), "end": fmt(peak + 30),
+                        "hook": hook_suggestion(text)})
+    return out
+
+
+def hook_suggestion(text):
+    """Premiere phrase courte du passage, en majuscules : point de depart a reecrire."""
+    parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text) if len(p.strip()) > 12]
+    s = (parts[0] if parts else text)[:60].rsplit(" ", 1)[0] if len(text) > 60 else (parts[0] if parts else text)
+    return s.upper().strip(" .")
+
+
+def project_info(name):
+    meta = projects_meta().get(name, {})
+    cfg = load_json(os.path.join(ROOT, "clips", name + ".json"), None)
+    used = [[c["start"], c["end"], c["name"]] for c in (cfg or {}).get("clips", [])]
+    fc = load_json(os.path.join(ROOT, "work", name, "facecam.json"), {})
+    leg_creator = parse_legendes(name)[2]
+    return {
+        "name": name, "creator": meta.get("creator") or (cfg or {}).get("creator") or leg_creator or name,
+        "url": meta.get("url", ""), "channel": meta.get("channel", ""), "vod": meta.get("vod", ""),
+        "video": os.path.exists(os.path.join(ROOT, "input", name + ".mp4")),
+        "analyzed": os.path.exists(os.path.join(ROOT, "work", name, "candidates.txt")),
+        "frame": os.path.exists(os.path.join(ROOT, "work", name, "frame.jpg")),
+        "facecam": (cfg or {}).get("facecam") if isinstance((cfg or {}).get("facecam"), list) else fc.get("rect"),
+        "layout": (cfg or {}).get("layout", "split"), "used": used,
+    }
+
+
+def all_projects():
+    names = set(projects_meta())
+    wdir = os.path.join(ROOT, "work")
+    for n in os.listdir(wdir) if os.path.isdir(wdir) else []:
+        if os.path.exists(os.path.join(wdir, n, "candidates.txt")):
+            names.add(n)
+    hidden = settings().get("hidden_projects", [])
+    return [project_info(n) for n in sorted(names) if n not in hidden]
+
+
+def create_clips(data):
+    name = slug(data.get("name") or "", 50)
+    info = project_info(name)
+    if not info["video"]:
+        raise ValueError("video source absente")
+    creator = (data.get("creator") or info["creator"]).strip()
+    layout = data.get("layout") or "split"
+    fc = data.get("facecam")
+    if layout == "split":
+        if not (isinstance(fc, list) and len(fc) == 4 and all(isinstance(v, (int, float)) for v in fc)
+                and fc[2] >= 40 and fc[3] >= 40):
+            raise ValueError("tracer le rectangle de la facecam (ou choisir 'pas de facecam')")
+        fc = [int(round(v)) for v in fc]
+    wanted = data.get("clips") or []
+    if not wanted:
+        raise ValueError("aucun moment choisi")
+    clean = []
+    for w in wanted:
+        a, b = tsec(w["start"]), tsec(w["end"])
+        hook = re.sub(r"\s+", " ", str(w.get("hook", ""))).strip().upper()
+        if b <= a or b - a > 180:
+            raise ValueError(f"temps invalides pour « {hook or w['start']} » (fin apres debut, 3 min max)")
+        if not hook:
+            raise ValueError(f"hook manquant pour le moment de {w['start']}")
+        if len(hook) > 70:
+            raise ValueError(f"hook trop long (70 caracteres max) : {hook[:30]}...")
+        clean.append((fmt(a), fmt(b), hook, str(w.get("caption", "")).strip()))
+
+    cpath = os.path.join(ROOT, "clips", name + ".json")
+    with _lock:
+        cfg = load_json(cpath, None) or {
+            "source": f"input/{name}.mp4", "captions": f"work/{name}/captions.json",
+            "cam_height": 640, "jumpcut": True, "fixes": {"GTA 6": "GTA VI"},
+            "highlight": ["gta", "vice city"], "clips": []}
+        cfg["creator"] = creator
+        cfg["layout"] = layout
+        if layout == "split":
+            cfg["facecam"] = fc
+        else:
+            cfg.pop("facecam", None)
+        nums = [int(c["name"][:2]) for c in cfg["clips"] if c["name"][:2].isdigit()]
+        n = max(nums, default=0)
+        new = []
+        for a, b, hook, cap in clean:
+            n += 1
+            clip_name = f"{n:02d}_{slug(hook, 24) or 'clip'}"
+            cfg["clips"].append({"name": clip_name, "start": a, "end": b, "hook": hook})
+            new.append((clip_name, a, b, hook, cap))
+        save_json(cpath, cfg)
+        write_legendes(name, creator, info, new)
+    return [queue_render(name + ".json", f"{name}/{c[0]}") for c in new]
+
+
+def write_legendes(name, creator, info, new):
+    """Ajoute les legendes des nouveaux clips a output/<nom>/legendes.txt (format lu par parse_legendes)."""
+    d = os.path.join(ROOT, "output", name)
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "legendes.txt")
+    where = info.get("channel") or info.get("url") or "Twitch"
+    tag = slug(creator, 30).replace("_", "")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            text = f.read().rstrip("\n") + "\n\n"
+    else:
+        text = (f"LÉGENDES TIKTOK — {creator} ({where}) — créditer {creator} dans chaque légende\n"
+                f"Ordre conseillé : \n\n")
+    for clip_name, a, b, hook, cap in new:
+        cap = cap or f"{hook[0] + hook[1:].lower()} 😳 #{tag} #gta6 #gtavi #twitch #clip"
+        text += f"{clip_name}.mp4  (~{int(tsec(b) - tsec(a))} s)\n{cap}\nSource : {creator} ({where})\n\n"
+    nums = re.findall(r"^(\d{2})_\S+\.mp4", text, re.M)
+    text = re.sub(r"^Ordre conseillé :.*$", "Ordre conseillé : " + ", ".join(nums), text, count=1, flags=re.M)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text.rstrip("\n") + "\n")
 
 
 # ------------------------------------------------------------------ HTTP
@@ -288,7 +580,23 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"clips": all_clips()})
         if path == "/api/jobs":
             with _lock:
-                return self.send_json({"jobs": list(reversed(_jobs))})
+                return self.send_json({"jobs": [public_job(j) for j in reversed(_jobs)]})
+        if path == "/api/projects":
+            return self.send_json({"projects": all_projects()})
+        m = re.match(r"^/api/projects/([\w\-]+)/candidates$", path)
+        if m:
+            return self.send_json({"project": project_info(m.group(1)), "candidates": parse_candidates(m.group(1))})
+        if path == "/api/settings":
+            return self.send_json({"iphone_dir": iphone_dir(), "saved": settings().get("iphone_dir"),
+                                   "detected": icloud_candidates()})
+        m = re.match(r"^/(source|frame)/([\w\-]+)$", path)
+        if m:
+            kind, name = m.groups()
+            p = (os.path.join(ROOT, "input", name + ".mp4") if kind == "source"
+                 else os.path.join(ROOT, "work", name, "frame.jpg"))
+            if not os.path.exists(p):
+                return self.send_error(404)
+            return self.send_file(p, "video/mp4" if kind == "source" else "image/jpeg")
         m = re.match(r"^/(video|thumb)/([\w\-]+)/([\w\-]+)$", path)
         if m:
             kind, sub, name = m.groups()
@@ -366,6 +674,38 @@ class Handler(BaseHTTPRequestHandler):
                 state.setdefault(key, {})["hidden"] = True
                 save_json(STATE, state)
             return self.send_json({"ok": True, "trashed": bool(vid)})
+        if path == "/api/send":
+            clip = self.clip_from_key(key)
+            vid = clip and find_video(clip["source"], clip["name"])
+            if not vid:
+                return self.send_json({"error": "video introuvable"}, 404)
+            try:
+                dst = send_to_iphone(key, vid)
+            except FileNotFoundError as e:
+                return self.send_json({"error": str(e), "setup": True}, 409)
+            return self.send_json({"ok": True, "path": dst})
+        if path == "/api/settings":
+            d = str(data.get("iphone_dir") or "").strip().strip('"')
+            if d and not os.path.isdir(d):
+                return self.send_json({"error": "dossier introuvable"}, 400)
+            with _lock:
+                s = settings()
+                if d:
+                    s["iphone_dir"] = d
+                else:
+                    s.pop("iphone_dir", None)
+                save_json(SETTINGS, s)
+            return self.send_json({"ok": True, "iphone_dir": iphone_dir()})
+        if path == "/api/import":
+            try:
+                return self.send_json({"ok": True, "job": start_import(data)})
+            except ValueError as e:
+                return self.send_json({"error": str(e)}, 400)
+        if path == "/api/create":
+            try:
+                return self.send_json({"ok": True, "jobs": create_clips(data)})
+            except (ValueError, KeyError) as e:
+                return self.send_json({"error": str(e)}, 400)
         if path == "/api/render":
             clip = self.clip_from_key(key)
             if not clip:
@@ -386,7 +726,8 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true")
     args = ap.parse_args()
-    threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=worker, args=(_job_q,), daemon=True).start()
+    threading.Thread(target=worker, args=(_import_q,), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)  # local seulement
     url = f"http://127.0.0.1:{args.port}"
     print(f"Gestion des clips : {url}  (Ctrl+C pour arreter)")

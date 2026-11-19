@@ -1,0 +1,26 @@
+{
+ "source": "input/jltomy_x_ego.mp4",
+ "captions": "work/jltomy_x_ego/captions.json",
+ "creator": "JLTomy",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [28, 449, 417, 234],
+ "jumpcut": false,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "sans deck": "sans déc",
+  "crois pas tes choux": "crois pas t'es chaud",
+  "Crois pas tes choux": "Crois pas t'es chaud"
+ },
+ "highlight": ["flic", "arrête", "chaud"],
+ "clips": [
+  {
+   "name": "01_ego_flic",
+   "start": "00:00:00",
+   "end": "00:00:58",
+   "hook": "IL FAIT L'ÉGO À UN FLIC ET LE REGRETTE",
+   "zooms": ["00:00:45", "00:00:53"],
+   "impacts": ["00:00:47", "00:00:54"]
+  }
+ ]
+}

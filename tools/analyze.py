@@ -201,7 +201,7 @@ def main():
             msgs = json.load(f)
 
     # 6. score : pics de volume (vs moyenne locale) + mots-cles + debit de parole + signaux
-    win = int(60 / BIN)
+    win = max(1, min(int(60 / BIN), len(db)))  # video de moins d'une minute : fenetre = toute la video
     kernel = np.ones(win) / win
     local = np.convolve(db, kernel, mode="same")
     excess = np.clip(db - local, 0, None)

@@ -1,0 +1,78 @@
+{
+ "source": "input/jltomy_live_20261119.mp4",
+ "captions": "work/jltomy_live_20261119/captions.json",
+ "creator": "JLTomy",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [
+  21,
+  300,
+  274,
+  154
+ ],
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "choc-bar": "choqué",
+  "Oh bata": "Oh putain",
+  "la vie de la mère": "sur la vie de ma mère",
+  "l'a vendu": "l'a attendu",
+  "pas sard": "pas ça"
+ },
+ "highlight": [
+  "chien",
+  "flics",
+  "police",
+  "GTA VI",
+  "Miami"
+ ],
+ "clips": [
+  {
+   "name": "01_chien_flic",
+   "start": "00:32:24",
+   "end": "00:36:32.5",
+   "hook": "Le chien de la police l'a reconnu",
+   "cuts": [
+    [
+     "00:33:14",
+     "00:33:21"
+    ],
+    [
+     "00:33:31",
+     "00:35:52"
+    ]
+   ],
+   "zooms": [
+    "00:32:35"
+   ],
+   "impacts": [
+    "00:32:49"
+   ],
+   "snap": false
+  },
+  {
+   "name": "02_pitbull",
+   "start": "01:33:10",
+   "end": "01:34:44",
+   "hook": "Il frappe un pitbull sans faire exprès",
+   "zooms": [
+    "01:33:24"
+   ],
+   "impacts": [
+    "01:34:40"
+   ]
+  },
+  {
+   "name": "03_attendu_13_ans",
+   "start": "01:28:48",
+   "end": "01:30:00",
+   "hook": "Le chat stresse, JLTomy les calme",
+   "zooms": [
+    "01:29:30"
+   ],
+   "impacts": [
+    "01:29:30"
+   ]
+  }
+ ]
+}

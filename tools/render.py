@@ -127,7 +127,7 @@ def load_caps(path):
 def clean_caps(caps):
     """Retire les doublons et les bouts de phrase sans duree que sort Whisper, avant l'affichage.
 
-    - texte avec * (hallucination sur la musique) ;
+    - mots avec * (hallucination sur la musique) ; ponctuation seule ou en debut de segment recollee a la ligne d'avant ;
     - meme texte et meme duree qu'un des 2 segments d'avant, a moins de 8 s (repetition inventee) ;
     - bout sans duree colle au segment d'avant : fin de phrase repetee (raccord entre deux blocs) retiree,
       ponctuation seule recollee au segment d'avant, sinon le temps du segment d'avant est partage entre les deux
@@ -135,8 +135,17 @@ def clean_caps(caps):
     """
     out = []
     for c in caps:
-        text = " ".join(c.get("text", "").split())
-        if not text or "*" in text:
+        text = " ".join(w for w in c.get("text", "").split() if "*" not in w)
+        # ponctuation en debut de segment (« ? Il y a un chien ») : recollee a la fin du segment d'avant
+        lead = re.match(r"^([!?.,…]+)\s*", text)
+        if lead and out:
+            out[-1]["text"] += " " + lead.group(1)
+            text = text[lead.end():]
+        if not text:
+            continue
+        if not _words(text):  # ponctuation seule
+            if out:
+                out[-1]["text"] += " " + text
             continue
         c = dict(c, text=text)
         dur = c["end"] - c["start"]
@@ -147,9 +156,6 @@ def clean_caps(caps):
         if out and dur < 250 and c["start"] - out[-1]["end"] < 300:
             p = out[-1]
             pw, cw = _words(p["text"]), _words(text)
-            if not cw:  # ponctuation seule
-                p["text"] += " " + text
-                continue
             if len(cw) <= len(pw) and pw[-len(cw):] == cw:
                 continue
             # partage le temps des segments colles d'avant (jusqu'a 4) pour que chacun ait ~0.3 s par mot

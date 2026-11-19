@@ -32,7 +32,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB = os.path.join(ROOT, "tools", "app_web")
+WEB = os.path.join(ROOT, "web", "out")  # interface Next.js (export statique, voir web/)
 STATE = os.path.join(ROOT, "data", "state.json")
 THUMBS = os.path.join(ROOT, "work", "_thumbs")
 SYNC = os.path.join(ROOT, "work", "_render", "sync.json")
@@ -145,10 +145,80 @@ def to_recycle_bin(paths):
         paths = [paths]
     if not paths:
         return
-    ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; foreach ($p in ($env:TRASH_PATHS -split \"`n\")) "
-          "{ if ($p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } }")
+    ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; $fs = [Microsoft.VisualBasic.FileIO.FileSystem]; "
+          "foreach ($p in ($env:TRASH_PATHS -split \"`n\")) { if ($p -and (Test-Path -LiteralPath $p)) { "
+          "if (Test-Path -LiteralPath $p -PathType Container) { $fs::DeleteDirectory($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } "
+          "else { $fs::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } } }")
     subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
                    env={**os.environ, "TRASH_PATHS": "\n".join(os.path.normpath(p) for p in paths)})
+
+
+def remove_legendes(sub, names):
+    """Retire les blocs des clips supprimes de output/<sub>/legendes.txt et de la ligne 'Ordre conseille'."""
+    path = os.path.join(ROOT, "output", sub, "legendes.txt")
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+    out, skip = [], False
+    for l in lines:
+        m = re.match(r"(\S+)\.mp4\b", l)
+        if m and m.group(1) in names:
+            skip = True
+            continue
+        if skip:
+            if l.strip() == "":
+                skip = False
+            continue
+        out.append(l)
+    nums = {n[:2] for n in names}
+    for i, l in enumerate(out[:4]):
+        m = re.match(r"(Ordre[^:]*:\s*)(.*)", l)
+        if m:
+            keep = [x for x in re.findall(r"\b\d{2}\b", m.group(2)) if x not in nums]
+            out[i] = m.group(1) + ", ".join(keep)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(out).rstrip("\n") + "\n")
+
+
+def delete_clips(clips):
+    """Supprime vraiment des clips : mp4 a la corbeille, retires de clips/*.json, de legendes.txt et du suivi.
+    Si un projet n'a plus aucun clip, son dossier output/<projet> et sa config partent aussi a la corbeille."""
+    trash, by_cfg = [], {}
+    for c in clips:
+        by_cfg.setdefault(c["config"], []).append(c)
+    emptied = []
+    with _lock:
+        for cfg_name, cs in by_cfg.items():
+            cpath = os.path.join(ROOT, "clips", cfg_name)
+            cfg = load_json(cpath, None)
+            if not cfg:
+                continue
+            sub = src_name(cfg)
+            names = {c["name"] for c in cs}
+            for n in names:
+                v = find_video(sub, n)
+                if v:
+                    trash.append(v)
+                t = os.path.join(THUMBS, f"{sub}__{n}.jpg")
+                if os.path.exists(t):
+                    os.remove(t)  # simple cache
+            cfg["clips"] = [x for x in cfg["clips"] if x["name"] not in names]
+            if cfg["clips"]:
+                save_json(cpath, cfg)
+                remove_legendes(sub, names)
+            else:
+                emptied.append(sub)
+                trash.append(cpath)
+                odir = os.path.join(ROOT, "output", sub)
+                if os.path.isdir(odir):
+                    trash = [p for p in trash if not p.startswith(odir + os.sep)] + [odir]
+        state = load_json(STATE, {})
+        for c in clips:
+            state.pop(c["key"], None)
+        save_json(STATE, state)
+    to_recycle_bin(trash)
+    return {"deleted": len(clips), "trashed": len(trash), "emptied": emptied}
 
 
 def thumb(path, key):
@@ -173,6 +243,7 @@ def all_clips():
     out = []
     for fn, cfg in configs():
         sub = src_name(cfg)
+        cfg_mtime = os.path.getmtime(os.path.join(ROOT, "clips", fn))
         leg, order, creator = parse_legendes(sub)
         for idx, c in enumerate(cfg["clips"]):
             name = c["name"]
@@ -188,6 +259,7 @@ def all_clips():
                 "outro": c.get("outro", ""), "zooms": c.get("zooms", []),
                 "video": bool(vid), "duration": duration(vid) if vid else None,
                 "mtime": os.path.getmtime(vid) if vid else None,
+                "date": os.path.getmtime(vid) if vid else cfg_mtime,  # tri du plus recent au plus ancien
                 "caption": leg.get(name, {}).get("caption", ""), "credit": leg.get(name, {}).get("source", ""),
                 "order": order.index(num) if num in order else 99 + idx,
                 "sync": sync.get(key) or sync.get(name),
@@ -264,7 +336,8 @@ def settings():
 def icloud_candidates():
     """Dossiers ou iCloud pour Windows envoie les fichiers vers Photos (selon la version)."""
     home = os.path.expanduser("~")
-    c = [os.path.join(home, "Pictures", "iCloud Photos", "Uploads"),
+    c = [os.path.join(home, "Pictures", "iCloud Photos", "Photos"),  # iCloud pour Windows 14+ (synchro dans les 2 sens)
+         os.path.join(home, "Pictures", "iCloud Photos", "Uploads"),
          os.path.join(home, "Pictures", "iCloud Photos"),
          os.path.join(home, "iCloud Photos", "Uploads"),
          os.path.join(home, "iCloudPhotos", "Uploads"),
@@ -571,13 +644,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         path = urllib.parse.unquote(u.path)
-        if path in ("/", "/index.html"):
-            return self.send_file(os.path.join(WEB, "index.html"), "text/html; charset=utf-8")
-        if path.startswith("/static/"):
-            rel = path[len("/static/"):]
-            base = os.path.join(ROOT, "assets") if rel.startswith("fonts/") else WEB
-            p = os.path.normpath(os.path.join(base, rel))
-            if p.startswith(base) and os.path.isfile(p):
+        if path.startswith("/static/fonts/"):
+            base = os.path.join(ROOT, "assets", "fonts")
+            p = os.path.normpath(os.path.join(base, path[len("/static/fonts/"):]))
+            if p.startswith(base + os.sep) and os.path.isfile(p):
                 return self.send_file(p)
             return self.send_error(404)
         if path == "/api/clips":
@@ -610,6 +680,20 @@ class Handler(BaseHTTPRequestHandler):
             if kind == "video":
                 return self.send_file(vid, "video/mp4")
             return self.send_file(thumb(vid, f"{sub}/{name}"), "image/jpeg")
+        # interface Next.js exportee (web/out)
+        if not os.path.isdir(WEB):
+            body = "Interface pas encore construite : lancer « cd web && npm install && npm run build »".encode()
+            self.send_response(503)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        rel = path.lstrip("/")
+        for cand in (rel, rel + ".html", os.path.join(rel, "index.html")):
+            p = os.path.normpath(os.path.join(WEB, cand))
+            if (p == WEB or p.startswith(WEB + os.sep)) and os.path.isfile(p):
+                ctype = "text/html; charset=utf-8" if p.endswith(".html") else None
+                return self.send_file(p, ctype)
         self.send_error(404)
 
     def do_POST(self):
@@ -666,21 +750,15 @@ class Handler(BaseHTTPRequestHandler):
             job = queue_render(clip["config"], key) if data.get("render", True) else None
             return self.send_json({"ok": True, "job": job})
         if path == "/api/delete":
-            # met les mp4 a la corbeille Windows (recuperable) et masque les clips dans l'appli
+            # supprime pour de bon (fichiers a la corbeille Windows, donc recuperables)
             keys = data.get("keys") or ([key] if key else [])
             if not isinstance(keys, list) or not keys or len(keys) > 500:
                 return self.send_json({"error": "aucun clip"}, 400)
-            clips = [self.clip_from_key(k) for k in keys]
+            index = {c["key"]: c for c in all_clips()}
+            clips = [index.get(k) for k in keys]
             if not all(clips):
                 return self.send_json({"error": "clip inconnu"}, 404)
-            vids = [v for v in (find_video(c["source"], c["name"]) for c in clips) if v]
-            to_recycle_bin(vids)
-            with _lock:
-                state = load_json(STATE, {})
-                for k in keys:
-                    state.setdefault(k, {})["hidden"] = True
-                save_json(STATE, state)
-            return self.send_json({"ok": True, "deleted": len(keys), "trashed": len(vids)})
+            return self.send_json({"ok": True, **delete_clips(clips)})
         if path == "/api/send":
             clip = self.clip_from_key(key)
             vid = clip and find_video(clip["source"], clip["name"])

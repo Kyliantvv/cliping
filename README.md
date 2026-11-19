@@ -41,14 +41,21 @@ Règles de montage : voir [PREFERENCES.md](PREFERENCES.md).
 
 ## Appli de gestion des clips
 Double-clic sur `lancer_app.bat` (ou `python tools/app.py`) : ouvre http://127.0.0.1:8765 (accessible seulement depuis ce PC).
-- Tous les clips de `output/`, groupés par streamer, aperçu au survol, badge synchro (dernier `check_sync`).
+Interface en Next.js (`web/`, export statique dans `web/out` servi par `tools/app.py`) ; le serveur Python garde
+toute la logique (rendus, corbeille, iCloud, imports). `lancer_app.bat` construit l'interface au premier lancement.
+Après une modification de `web/` : `cd web && npm run build`. Pour développer : `npm run dev` (port 3000, appels
+relayés vers le serveur Python, qui doit tourner).
+- Tous les clips de `output/`, du plus récent au plus ancien (sections Aujourd'hui / Hier / date), filtre par
+  streamer, aperçu au survol, pastille synchro (dernier `check_sync`).
 - « Prochain à poster » : clip conseillé (ordre de `legendes.txt`) + bouton « Copier la légende » (légende + crédit).
 - Suivi : À poster / Programmé (date) / Posté, lien TikTok, vues, likes, notes. Stocké dans `data/state.json` (pas sur GitHub).
 - Modifier hook, début, fin, texte de fin puis « Enregistrer et re-rendre » : met à jour `clips/*.json`, relance
   `render.py` puis `check_sync.py` en arrière-plan.
 - Raccourcis : `/` chercher, `←` `→` clip suivant, `C` copier la légende, `Échap` fermer.
 - « Sélectionner » : cocher plusieurs clips (Maj+clic pour un intervalle, Ctrl+A pour tous les clips affichés)
-  puis « Supprimer » (ou touche Suppr) : les mp4 partent à la corbeille Windows, récupérables.
+  puis « Supprimer » (ou touche Suppr). Suppression complète : le mp4 part à la corbeille Windows (récupérable),
+  le clip est retiré de `clips/*.json`, de `legendes.txt` et du suivi. Si un projet n'a plus de clip, son dossier
+  `output/<projet>` et sa config partent aussi à la corbeille.
 - « Envoyer sur l'iPhone » : copie le mp4 dans le dossier iCloud Photos (iCloud pour Windows, option Photos cochée) ;
   il arrive dans la galerie de l'iPhone 1 à 2 min plus tard. Dossier détecté tout seul ou réglé via le bouton 📱 iPhone
   (`data/settings.json`).
@@ -89,7 +96,7 @@ Double-clic sur `lancer_app.bat` (ou `python tools/app.py`) : ouvre http://127.0
   Solution de secours : un export JSON de TwitchDownloader, avec `--chat chemin/chat.json`.
 
 ## Installation (nouveau PC)
-- ffmpeg 8+ build « full » (filtre whisper), Python 3 avec `numpy onnxruntime yt-dlp`.
+- ffmpeg 8+ build « full » (filtre whisper), Python 3 avec `numpy onnxruntime yt-dlp`. Node.js 20+ (interface de l'appli).
 - Mettre dans `models/` : `ggml-large-v3-turbo-q5_0.bin` (whisper.cpp), `yamnet.onnx` + `yamnet_class_map.csv`
   (zeropointnine/yamnet-onnx), `ultraface-RFB-320.onnx` (Linzaer/Ultra-Light-Fast-Generic-Face-Detector).
 - Les dossiers `input/`, `work/`, `models/` et les mp4 de `output/` ne sont pas versionnés.

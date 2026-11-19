@@ -139,12 +139,16 @@ def parse_legendes(sub):
     return res, order, creator
 
 
-def to_recycle_bin(path):
-    """Corbeille Windows plutot que suppression definitive."""
-    ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
-          "$env:TRASH_PATH, 'OnlyErrorDialogs', 'SendToRecycleBin')")
+def to_recycle_bin(paths):
+    """Corbeille Windows plutot que suppression definitive (un seul PowerShell pour plusieurs fichiers)."""
+    if isinstance(paths, str):
+        paths = [paths]
+    if not paths:
+        return
+    ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; foreach ($p in ($env:TRASH_PATHS -split \"`n\")) "
+          "{ if ($p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } }")
     subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
-                   env={**os.environ, "TRASH_PATH": os.path.normpath(path)})
+                   env={**os.environ, "TRASH_PATHS": "\n".join(os.path.normpath(p) for p in paths)})
 
 
 def thumb(path, key):
@@ -662,18 +666,21 @@ class Handler(BaseHTTPRequestHandler):
             job = queue_render(clip["config"], key) if data.get("render", True) else None
             return self.send_json({"ok": True, "job": job})
         if path == "/api/delete":
-            # met le mp4 a la corbeille Windows (recuperable) et masque le clip dans l'appli
-            clip = self.clip_from_key(key)
-            if not clip:
+            # met les mp4 a la corbeille Windows (recuperable) et masque les clips dans l'appli
+            keys = data.get("keys") or ([key] if key else [])
+            if not isinstance(keys, list) or not keys or len(keys) > 500:
+                return self.send_json({"error": "aucun clip"}, 400)
+            clips = [self.clip_from_key(k) for k in keys]
+            if not all(clips):
                 return self.send_json({"error": "clip inconnu"}, 404)
-            vid = find_video(clip["source"], clip["name"])
-            if vid:
-                to_recycle_bin(vid)
+            vids = [v for v in (find_video(c["source"], c["name"]) for c in clips) if v]
+            to_recycle_bin(vids)
             with _lock:
                 state = load_json(STATE, {})
-                state.setdefault(key, {})["hidden"] = True
+                for k in keys:
+                    state.setdefault(k, {})["hidden"] = True
                 save_json(STATE, state)
-            return self.send_json({"ok": True, "trashed": bool(vid)})
+            return self.send_json({"ok": True, "deleted": len(keys), "trashed": len(vids)})
         if path == "/api/send":
             clip = self.clip_from_key(key)
             vid = clip and find_video(clip["source"], clip["name"])

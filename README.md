@@ -47,6 +47,8 @@ Double-clic sur `lancer_app.bat` (ou `python tools/app.py`) : ouvre http://127.0
 - Modifier hook, début, fin, texte de fin puis « Enregistrer et re-rendre » : met à jour `clips/*.json`, relance
   `render.py` puis `check_sync.py` en arrière-plan.
 - Raccourcis : `/` chercher, `←` `→` clip suivant, `C` copier la légende, `Échap` fermer.
+- « Sélectionner » : cocher plusieurs clips (Maj+clic pour un intervalle, Ctrl+A pour tous les clips affichés)
+  puis « Supprimer » (ou touche Suppr) : les mp4 partent à la corbeille Windows, récupérables.
 - « Envoyer sur l'iPhone » : copie le mp4 dans le dossier iCloud Photos (iCloud pour Windows, option Photos cochée) ;
   il arrive dans la galerie de l'iPhone 1 à 2 min plus tard. Dossier détecté tout seul ou réglé via le bouton 📱 iPhone
   (`data/settings.json`).

@@ -784,6 +784,18 @@ class Handler(BaseHTTPRequestHandler):
             except FileNotFoundError as e:
                 return self.send_json({"error": str(e), "setup": True}, 409)
             return self.send_json({"ok": True, "path": dst})
+        if path == "/api/share":
+            clip = self.clip_from_key(key)
+            vid = clip and find_video(clip["source"], clip["name"])
+            if not vid:
+                return self.send_json({"error": "video introuvable"}, 404)
+            try:
+                return self.send_json({"ok": True, **create_share(clip, vid)})
+            except OSError as e:
+                return self.send_json({"error": str(e)}, 500)
+        if path == "/api/share/status":
+            sh = _shares.get(str(data.get("token", "")))
+            return self.send_json({"downloads": sh["downloads"] if sh else 0, "alive": bool(sh and sh["expires"] > time.time())})
         if path == "/api/settings":
             d = str(data.get("iphone_dir") or "").strip().strip('"')
             if d and not os.path.isdir(d):
@@ -819,6 +831,100 @@ class Handler(BaseHTTPRequestHandler):
             subprocess.Popen(["explorer", "/select,", os.path.normpath(vid)])
             return self.send_json({"ok": True})
         self.send_error(404)
+
+
+# ------------------------------------------------------------------ partage Wi-Fi (QR code -> iPhone)
+# Second serveur, ouvert sur le reseau local seulement quand on demande un QR code. Il ne sert QUE des liens
+# temporaires (jeton aleatoire, 20 min) vers UN clip : aucune API, aucune autre page n'y est accessible.
+SHARE_PORT = 8766
+SHARE_TTL = 20 * 60
+_shares = {}          # jeton -> {key, path, name, expires, downloads}
+_share_srv = None
+
+
+def lan_ip():
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))  # UDP : aucun paquet envoye, sert juste a choisir l'interface
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
+SHARE_PAGE = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>
+<style>body{{margin:0;background:#0b0612;color:#f6f0ff;font:16px/1.45 -apple-system,system-ui,sans-serif;padding:20px 16px 40px}}
+h1{{font-size:19px;text-transform:uppercase;margin:4px 0 14px}}video{{width:100%;max-height:60vh;border-radius:14px;background:#000}}
+a.b{{display:block;text-align:center;margin:16px 0;padding:15px;border-radius:14px;background:linear-gradient(100deg,#ff4fa3,#ff9a3c);color:#1a0b2e;font-weight:800;text-decoration:none}}
+ol{{color:#a194b8;padding-left:20px}}b{{color:#f6f0ff}}small{{color:#a194b8}}</style></head><body>
+<small>CLIPS GTA VI</small><h1>{title}</h1>
+<video src="{video}" controls playsinline preload="metadata"></video>
+<a class="b" href="{video}?dl=1" download="{fname}">Télécharger la vidéo</a>
+<ol><li>Touche <b>Télécharger la vidéo</b>, puis <b>Télécharger</b>.</li>
+<li>Ouvre les téléchargements (flèche bleue en haut de Safari), touche la vidéo.</li>
+<li>Bouton <b>Partager</b> › <b>Enregistrer la vidéo</b> : elle est dans Photos.</li></ol>
+<small>Lien valable 20 min, seulement sur ton Wi-Fi.</small></body></html>"""
+
+
+class ShareHandler(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    send_file = Handler.send_file
+
+    def do_GET(self):
+        u = urllib.parse.urlparse(self.path)
+        m = re.match(r"^/s/([A-Za-z0-9_\-]{20,})(/video\.mp4)?$", u.path)
+        sh = _shares.get(m.group(1)) if m else None
+        if not sh or sh["expires"] < time.time() or not os.path.exists(sh["path"]):
+            return self.send_error(404, "Lien expire : regenerer le QR code dans l'appli")
+        if not m.group(2):
+            title = sh["hook"] or sh["name"]
+            body = SHARE_PAGE.format(title=title.replace("<", "&lt;"), video=f"/s/{m.group(1)}/video.mp4",
+                                     fname=sh["name"] + ".mp4").encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(body)
+        if "dl=1" in u.query:
+            self._dlname = sh["name"] + ".mp4"
+            sh["downloads"] += 1
+            with _lock:
+                state = load_json(STATE, {})
+                state.setdefault(sh["key"], {})["sent_at"] = time.strftime("%Y-%m-%d %H:%M")
+                save_json(STATE, state)
+        self.send_file(sh["path"], "video/mp4")
+
+    def end_headers(self):
+        if getattr(self, "_dlname", None):
+            self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{urllib.parse.quote(self._dlname)}")
+            self._dlname = None
+        super().end_headers()
+
+
+def create_share(clip, vid):
+    """Cree un lien temporaire Wi-Fi vers un clip ; lance le serveur de partage au premier appel."""
+    global _share_srv
+    import secrets
+    ip = lan_ip()
+    if not ip:
+        raise OSError("pas de reseau local : connecte le PC au Wi-Fi ou au cable")
+    with _lock:
+        if _share_srv is None:
+            _share_srv = ThreadingHTTPServer(("0.0.0.0", SHARE_PORT), ShareHandler)
+            threading.Thread(target=_share_srv.serve_forever, daemon=True).start()
+        now = time.time()
+        for t in [t for t, s in _shares.items() if s["expires"] < now]:
+            del _shares[t]
+        tok = secrets.token_urlsafe(18)
+        _shares[tok] = {"key": clip["key"], "path": vid, "name": clip["name"], "hook": clip.get("hook", ""),
+                        "expires": now + SHARE_TTL, "downloads": 0}
+    return {"token": tok, "url": f"http://{ip}:{SHARE_PORT}/s/{tok}", "expires": int(now + SHARE_TTL)}
 
 
 def main():

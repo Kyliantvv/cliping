@@ -273,6 +273,20 @@ dialog::backdrop { background: rgba(5, 2, 10, 0.72); backdrop-filter: blur(4px);
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 22px; padding: 14px; border: 1px solid rgba(255, 90, 106, 0.3); border-radius: var(--r-sm); background: rgba(255, 90, 106, 0.05); }
 .danger-zone p { margin: 2px 0 0; }
 
+/* ---------- QR iPhone ---------- */
+.qr-dialog { width: min(440px, calc(100% - 32px)); }
+.qr-head { display: flex; justify-content: space-between; align-items: center; }
+.qr-head h3 { margin: 0; }
+.qr-hook { margin: 2px 0 14px; text-transform: uppercase; font-weight: 700; }
+.qr-box { position: relative; display: grid; place-items: center; aspect-ratio: 1; width: min(280px, 100%); margin: 0 auto; padding: 12px; background: #fff; border-radius: 18px; }
+.qr-box img { width: 100%; height: 100%; image-rendering: pixelated; }
+.qr-box .spinner { color: #0b0612; width: 28px; height: 28px; }
+.qr-done { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-radius: 18px; background: rgba(11, 6, 18, 0.88); color: var(--teal); animation: pop 0.2s var(--ease); }
+.qr-steps { padding-left: 20px; margin: 16px 0 8px; color: var(--muted); }
+.qr-steps li { margin-bottom: 4px; }
+.qr-steps b { color: var(--text); }
+.qr-url { font-family: ui-monospace, Consolas, monospace; word-break: break-all; opacity: 0.7; }
+
 /* ---------- toasts ---------- */
 .toasts { position: fixed; z-index: 100; top: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
 .toast { padding: 10px 16px; border-radius: 12px; background: var(--text); color: #1a0b2e; font-weight: 700; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); animation: slide 0.22s var(--ease); max-width: 380px; }

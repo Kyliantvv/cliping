@@ -6,6 +6,7 @@ import {
 import { Icon, useUI } from "./ui";
 import ClipCard from "./ClipCard";
 import ClipModal from "./ClipModal";
+import QrDialog from "./QrDialog";
 
 type Filter = "tout" | Status | "verifier";
 type Sort = "recent" | "order" | "views" | "duration";
@@ -90,7 +91,10 @@ export default function ClipsView({ clips, reload, busy, onIphoneSetup }: {
     if ([...sel].some((k) => !keys.has(k))) setSel(new Set([...sel].filter((k) => keys.has(k))));
   }, [all, sel]);
 
-  const sendToIphone = useCallback(async (c: Clip) => {
+  const [qr, setQr] = useState<Clip | null>(null);
+  const sendToIphone = useCallback((c: Clip) => setQr(c), []);
+
+  const sendIcloud = useCallback(async (c: Clip) => {
     try {
       toast("Copie vers iCloud Photos…");
       await api("/api/send", { key: c.key });
@@ -238,7 +242,7 @@ export default function ClipsView({ clips, reload, busy, onIphoneSetup }: {
           </div>
           <div className="next-actions">
             <button className="btn primary" onClick={() => copyCaption(next)}><Icon name="copy" size={16} /> Copier la légende</button>
-            <button className="btn" onClick={() => sendToIphone(next)}><Icon name="send" size={16} /> {next.sent_at ? "Renvoyer" : "Envoyer"} sur l&apos;iPhone</button>
+            <button className="btn" onClick={() => sendToIphone(next)}><Icon name="phone" size={16} /> {next.sent_at ? "Renvoyer" : "Envoyer"} sur l&apos;iPhone</button>
             <div className="row-btns">
               <button className="btn ghost" onClick={async () => { await api("/api/state", { key: next.key, status: "poste" }); toast("Marqué posté"); reload(); }}>Marquer posté</button>
               <button className="btn ghost" onClick={() => setOpenKey(next.key)}>Ouvrir</button>
@@ -330,6 +334,11 @@ export default function ClipsView({ clips, reload, busy, onIphoneSetup }: {
           </button>
           <button className="btn ghost icon" aria-label="Fermer la sélection" onClick={() => setSel(null)}><Icon name="x" size={16} /></button>
         </div>
+      )}
+
+      {qr && (
+        <QrDialog clip={qr} onClose={() => setQr(null)} onIcloud={sendIcloud}
+          onDownloaded={() => { toast("Clip téléchargé sur l'iPhone"); reload(); }} />
       )}
 
       {openClip && (

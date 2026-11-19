@@ -56,9 +56,10 @@ relayés vers le serveur Python, qui doit tourner).
   puis « Supprimer » (ou touche Suppr). Suppression complète : le mp4 part à la corbeille Windows (récupérable),
   le clip est retiré de `clips/*.json`, de `legendes.txt` et du suivi. Si un projet n'a plus de clip, son dossier
   `output/<projet>` et sa config partent aussi à la corbeille.
-- « Envoyer sur l'iPhone » : copie le mp4 dans le dossier iCloud Photos (iCloud pour Windows, option Photos cochée) ;
-  il arrive dans la galerie de l'iPhone 1 à 2 min plus tard. Dossier détecté tout seul ou réglé via le bouton 📱 iPhone
-  (`data/settings.json`).
+- « Envoyer sur l'iPhone » : affiche un QR code. L'iPhone (même Wi-Fi) l'ouvre avec l'appareil photo et télécharge
+  le clip, puis Partager › Enregistrer la vidéo. Le lien passe par un 2e serveur (port 8766) ouvert sur le réseau local
+  seulement après le premier QR : il ne sert qu'un clip par jeton aléatoire, valable 20 min (l'API reste sur 127.0.0.1).
+  Secours : « Envoyer via iCloud » copie le mp4 (avec la date du jour) dans `Images\iCloud Photos\Photos`.
 - Onglet « + Nouveau stream » : lien d'une VOD Twitch ou d'une chaîne (dernière VOD) + nom du streamer.
   L'appli enchaîne `twitch_vod.py` puis `analyze.py --chat` en arrière-plan (journal en direct), puis liste les moments
   repérés : cocher, écrire le hook, ajuster début/fin, tracer la facecam sur une image du stream (ou « pas de facecam »).

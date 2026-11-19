@@ -139,7 +139,7 @@ export default function ClipModal({ clip: c, list, onNavigate, onClose, reload, 
               <div className="capbox">{fullCaption(c) || <i className="muted">Pas de légende dans legendes.txt</i>}</div>
               <div className="btn-row">
                 <button className="btn primary" onClick={() => copyCaption(c)}><Icon name="copy" size={16} /> Copier <kbd>C</kbd></button>
-                {c.video && <button className="btn" onClick={() => sendToIphone(c)}><Icon name="send" size={16} /> {c.sent_at ? "Renvoyer" : "iPhone"}</button>}
+                {c.video && <button className="btn" onClick={() => sendToIphone(c)}><Icon name="phone" size={16} /> {c.sent_at ? "Renvoyer" : "iPhone"}</button>}
                 {c.video && <a className="btn ghost" href={videoUrl(c)} download={`${c.name}.mp4`}><Icon name="download" size={16} /> mp4</a>}
                 {c.video && <button className="btn ghost" onClick={() => api("/api/open", { key: c.key })}><Icon name="folder" size={16} /> Dossier</button>}
               </div>

@@ -152,9 +152,12 @@ export default function ClipsView({ clips, reload, busy, onIphoneSetup }: {
     });
     if (!ok) return false;
     setDeleting(true);
+    // coupe les vidéos en lecture : sinon Windows refuse d'effacer un mp4 encore ouvert
+    document.querySelectorAll("video").forEach((v) => { v.pause(); v.removeAttribute("src"); v.load(); });
     try {
-      const r = await api<{ deleted: number; emptied: string[] }>("/api/delete", { keys });
+      const r = await api<{ deleted: number; emptied: string[]; locked: string[] }>("/api/delete", { keys });
       toast(`${plural(r.deleted, "clip supprimé", "clips supprimés")}` + (r.emptied.length ? " · dossier supprimé" : ""));
+      if (r.locked.length) toast(`${plural(r.locked.length, "fichier encore ouvert", "fichiers encore ouverts")} : ferme-le puis réessaie (${r.locked.join(", ")})`, "err");
       await reload();
       return true;
     } catch (e) {

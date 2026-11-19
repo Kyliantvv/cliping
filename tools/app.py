@@ -141,16 +141,23 @@ def parse_legendes(sub):
 
 def to_recycle_bin(paths):
     """Corbeille Windows plutot que suppression definitive (un seul PowerShell pour plusieurs fichiers)."""
+    """Renvoie la liste des chemins qui n'ont pas pu partir (fichier ouvert ailleurs, ex. video en lecture)."""
     if isinstance(paths, str):
         paths = [paths]
     if not paths:
-        return
+        return []
+    # chaque fichier est tente plusieurs fois : un mp4 encore lu par le navigateur se libere en 1 ou 2 s
     ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; $fs = [Microsoft.VisualBasic.FileIO.FileSystem]; "
-          "foreach ($p in ($env:TRASH_PATHS -split \"`n\")) { if ($p -and (Test-Path -LiteralPath $p)) { "
-          "if (Test-Path -LiteralPath $p -PathType Container) { $fs::DeleteDirectory($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } "
-          "else { $fs::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') } } }")
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
-                   env={**os.environ, "TRASH_PATHS": "\n".join(os.path.normpath(p) for p in paths)})
+          "foreach ($p in ($env:TRASH_PATHS -split \"`n\")) { if (-not $p) { continue }; $ok = $false; "
+          "for ($i = 0; $i -lt 6 -and -not $ok; $i++) { try { "
+          "if (-not (Test-Path -LiteralPath $p)) { $ok = $true } "
+          "elseif (Test-Path -LiteralPath $p -PathType Container) { $fs::DeleteDirectory($p, 'OnlyErrorDialogs', 'SendToRecycleBin'); $ok = $true } "
+          "else { $fs::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin'); $ok = $true } "
+          "} catch { Start-Sleep -Milliseconds 700 } }; if (-not $ok) { Write-Output \"ECHEC|$p\" } }")
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace",
+                       env={**os.environ, "TRASH_PATHS": "\n".join(os.path.normpath(p) for p in paths)})
+    return [l.split("|", 1)[1].strip() for l in r.stdout.splitlines() if l.startswith("ECHEC|")]
 
 
 def remove_legendes(sub, names):
@@ -217,8 +224,9 @@ def delete_clips(clips):
         for c in clips:
             state.pop(c["key"], None)
         save_json(STATE, state)
-    to_recycle_bin(trash)
-    return {"deleted": len(clips), "trashed": len(trash), "emptied": emptied}
+    failed = to_recycle_bin(trash)
+    return {"deleted": len(clips), "trashed": len(trash) - len(failed), "emptied": emptied,
+            "locked": [os.path.relpath(p, ROOT) for p in failed]}
 
 
 def thumb(path, key):

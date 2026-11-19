@@ -121,7 +121,72 @@ def load_caps(path):
                     caps.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
-    return caps
+    return clean_caps(caps)
+
+
+def clean_caps(caps):
+    """Retire les doublons et les bouts de phrase sans duree que sort Whisper, avant l'affichage.
+
+    - texte avec * (hallucination sur la musique) ;
+    - meme texte et meme duree qu'un des 2 segments d'avant, a moins de 8 s (repetition inventee) ;
+    - bout sans duree colle au segment d'avant : fin de phrase repetee (raccord entre deux blocs) retiree,
+      ponctuation seule recollee au segment d'avant, sinon le temps du segment d'avant est partage entre les deux
+      (sinon les mots s'empilent au meme instant et deux lignes s'affichent en meme temps).
+    """
+    out = []
+    for c in caps:
+        text = " ".join(c.get("text", "").split())
+        if not text or "*" in text:
+            continue
+        c = dict(c, text=text)
+        dur = c["end"] - c["start"]
+        low = text.lower()
+        if any(low == q["text"].lower() and abs((q["end"] - q["start"]) - dur) <= 30 and c["start"] - q["end"] < 8000
+               for q in out[-2:]):
+            continue
+        if out and dur < 250 and c["start"] - out[-1]["end"] < 300:
+            p = out[-1]
+            pw, cw = _words(p["text"]), _words(text)
+            if not cw:  # ponctuation seule
+                p["text"] += " " + text
+                continue
+            if len(cw) <= len(pw) and pw[-len(cw):] == cw:
+                continue
+            # partage le temps des segments colles d'avant (jusqu'a 4) pour que chacun ait ~0.3 s par mot
+            grp = [c]
+            while len(grp) < 5 and len(out) >= len(grp):
+                q = out[-len(grp)]
+                grp.insert(0, q)
+                span = max(x["end"] for x in grp) - grp[0]["start"]
+                n = sum(len(_words(x["text"])) for x in grp)
+                prev = out[-len(grp)] if len(out) >= len(grp) else None
+                if span >= 300 * n or prev is None or q["start"] - prev["end"] >= 300:
+                    break
+            a, b = grp[0]["start"], max(x["end"] for x in grp)
+            tot = sum(len(x["text"]) for x in grp)
+            t = a
+            for x in grp:
+                x["start"], t = int(t), t + (b - a) * len(x["text"]) / tot
+                x["end"] = int(t)
+        out.append(c)
+    # bout sans duree isole : on lui donne du temps sur le blanc qui suit (sans deborder sur le segment suivant)
+    for i in range(len(out) - 1, -1, -1):
+        c = out[i]
+        if c["end"] - c["start"] < 250:
+            lim = out[i + 1]["start"] if i + 1 < len(out) else c["start"] + 10000
+            c["end"] = max(c["end"], min(lim, c["start"] + max(400, 70 * len(c["text"]))))
+    # bout sans duree en debut de phrase : partage le temps du segment suivant
+    for i in range(len(out) - 1):
+        c, n = out[i], out[i + 1]
+        if c["end"] - c["start"] < 250 and n["start"] - c["end"] < 300 and n["end"] - c["start"] >= 250:
+            a, b = c["start"], n["end"]
+            cut = a + int((b - a) * len(c["text"]) / (len(c["text"]) + len(n["text"])))
+            c["end"], n["start"] = cut, cut
+    return out
+
+
+def _words(text):
+    return re.findall(r"[\w']+", text.lower())
 
 
 def fix_text(text, cfg):
@@ -399,6 +464,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   r"{\fscx60\fscy60\t(0,150,\fscx100\fscy100)}" + esc(clip["outro"].upper()))
 
     karaoke = clip.get("karaoke", cfg.get("karaoke", True))
+    cap_ev = []
     caps = [c for c in caps if c["end"] / 1000.0 > tl.start and c["start"] / 1000.0 < tl.end]
     for ci, c in enumerate(caps):
         s, e = c["start"] / 1000.0, c["end"] / 1000.0
@@ -417,8 +483,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if not karaoke:
             rng = tl.map_range(s, e)
             if rng:
-                ev.append(f"Dialogue: 0,{ass_time(rng[0])},{ass_time(rng[1])},Cap,,0,0,0,,"
-                          r"{\fscx85\fscy85\t(0,90,\fscx105\fscy105)\t(90,160,\fscx100\fscy100)}" + " ".join(base))
+                cap_ev.append([rng[0], rng[1], r"{\fscx85\fscy85\t(0,90,\fscx105\fscy105)\t(90,160,\fscx100\fscy100)}"
+                               + " ".join(base)])
             continue
         first = True
         for i, (w, ws, we) in enumerate(words):
@@ -432,7 +498,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                      for j, b in enumerate(base)]
             anim = r"{\fscx85\fscy85\t(0,80,\fscx100\fscy100)}" if first else ""
             first = False
-            ev.append(f"Dialogue: 0,{ass_time(rng[0])},{ass_time(rng[1])},Cap,,0,0,0,,{anim}" + " ".join(parts))
+            cap_ev.append([rng[0], rng[1], anim + " ".join(parts)])
+    # jamais deux lignes de sous-titres en meme temps (libass les empile : texte en double a l'ecran)
+    cap_ev.sort(key=lambda x: x[0])
+    for k, (a, b, txt) in enumerate(cap_ev):
+        if k + 1 < len(cap_ev):
+            b = min(b, cap_ev[k + 1][0])
+        if b - a >= 0.02:
+            ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Cap,,0,0,0,,{txt}")
     with open(path, "w", encoding="utf-8-sig") as f:
         f.write(head + "\n".join(ev) + "\n")
     return hd

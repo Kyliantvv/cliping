@@ -45,6 +45,22 @@ def read_words(ass_path):
     return out
 
 
+def doubles(ass_path):
+    """Sous-titres en double : deux lignes affichees en meme temps, ou la meme ligne repetee a moins de 4 s."""
+    ev = []
+    with open(ass_path, encoding="utf-8-sig") as f:
+        for line in f:
+            if line.startswith("Dialogue:") and ",Cap," in line:
+                parts = line.rstrip("\n").split(",", 9)
+                ev.append((ass_t(parts[1]), ass_t(parts[2]), re.sub(r"{[^}]*}", "", parts[9]).strip(),
+                           parts[9].startswith("{\\fscx85")))
+    ev.sort()
+    over = [a for (a, _, _, _), (_, pb, _, _) in zip(ev[1:], ev) if a < pb - 0.03]
+    lines = [(a, t) for a, _, t, new in ev if new]
+    rep = [(a, t) for (a, t), (pa, pt) in zip(lines[1:], lines) if t == pt and a - pa < 4]
+    return over, rep
+
+
 def voice(mp4):
     r = subprocess.run(["ffmpeg", "-v", "error", "-i", mp4, "-vn", "-ac", "1", "-ar", str(SR), "-f", "s16le", "-"],
                        capture_output=True)
@@ -146,14 +162,20 @@ def check(name, sub=""):
     # 3. decalage global = mediane signee des ecarts (robuste aux bruits du jeu pris pour de la voix)
     glob = float(np.median(errs))
     med, p90 = float(np.median(np.abs(errs))), float(np.percentile(np.abs(errs), 90))
-    ok = med <= 0.2 and sil_pct <= 10 and abs(glob) <= 0.15  # p90 indicatif : voix du jeu non sous-titrees
+    over, rep = doubles(ass)
+    ok = med <= 0.2 and sil_pct <= 10 and abs(glob) <= 0.15 and not over and not rep  # p90 indicatif
     png = os.path.join(os.path.dirname(ass), f"{name}_sync.png")
     draw(words, on, db, png, name)
     print(f"{name}: {'OK' if ok else 'A VERIFIER'}  reprise de parole -> mot : ecart median {med:.2f} s, pire 10 % {p90:.2f} s | "
           f"mots sur un blanc : {sil_pct:.0f} % | decalage global {glob:+.2f} s "
           f"({'sous-titres en retard' if glob > 0 else 'sous-titres en avance'} si non nul)")
+    for a in over[:5]:
+        print(f"   ! deux lignes de sous-titres en meme temps a {a:.1f} s")
+    for a, t in rep[:5]:
+        print(f"   ! ligne repetee a {a:.1f} s : {t}")
     save_result(f"{sub}/{name}" if sub else name, {"ok": bool(ok), "median": round(med, 2), "p90": round(p90, 2),
-                                                     "silence_pct": round(sil_pct, 1), "offset": round(glob, 2)})
+                                                     "silence_pct": round(sil_pct, 1), "offset": round(glob, 2),
+                                                     "doubles": len(over) + len(rep)})
     return ok
 
 

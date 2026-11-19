@@ -37,7 +37,16 @@ Règles de montage : voir [PREFERENCES.md](PREFERENCES.md).
    ```
    python tools/check_sync.py clips/ma_video.json
    ```
-   Verdict OK / A VERIFIER par clip + image `work/_render/<clip>_sync.png` (gris = voix, couleurs = mots).
+   Verdict OK / A VERIFIER par clip + image `work/_render/<video>/<clip>_sync.png` (gris = voix, couleurs = mots).
+
+## Appli de gestion des clips
+Double-clic sur `lancer_app.bat` (ou `python tools/app.py`) : ouvre http://127.0.0.1:8765 (accessible seulement depuis ce PC).
+- Tous les clips de `output/`, groupés par streamer, aperçu au survol, badge synchro (dernier `check_sync`).
+- « Prochain à poster » : clip conseillé (ordre de `legendes.txt`) + bouton « Copier la légende » (légende + crédit).
+- Suivi : À poster / Programmé (date) / Posté, lien TikTok, vues, likes, notes. Stocké dans `data/state.json` (pas sur GitHub).
+- Modifier hook, début, fin, texte de fin puis « Enregistrer et re-rendre » : met à jour `clips/*.json`, relance
+  `render.py` puis `check_sync.py` en arrière-plan.
+- Raccourcis : `/` chercher, `←` `→` clip suivant, `C` copier la légende, `Échap` fermer.
 
 ## Signaux utilisés pour trouver les moments
 | Signal | Outil | Pour quoi |

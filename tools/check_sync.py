@@ -3,11 +3,11 @@
 Usage :
     python tools/check_sync.py clips/mon_stream.json [--only 01_nom]
 
-Pour chaque clip deja rendu (output/<nom>.mp4 + work/_render/<nom>.ass) :
+Pour chaque clip deja rendu (output/<nom>.mp4 + work/_render/<video>/<nom>.ass) :
   - a chaque reprise de parole : ecart avec le mot qui s'allume (mediane, pire 10 %)
   - part du temps ou un mot est surligne alors que personne ne parle
   - decalage global estime (sous-titres trop tot / trop tard)
-  - image work/_render/<nom>_sync.png : voix (gris) + mots (couleurs), 15 s par ligne, pour controler a l'oeil
+  - image work/_render/<video>/<nom>_sync.png : voix (gris) + mots (couleurs), 15 s par ligne, pour controler a l'oeil
 Verdict OK / A VERIFIER par clip.
 """
 import argparse
@@ -109,7 +109,9 @@ def draw(words, on, db, path, title):
 
 def check(name, sub=""):
     mp4 = os.path.join(ROOT, "output", sub, f"{name}.mp4")
-    ass = os.path.join(ROOT, "work", "_render", f"{name}.ass")
+    ass = os.path.join(ROOT, "work", "_render", sub, f"{name}.ass")
+    if not os.path.exists(ass):  # rendus d'avant le rangement par sous-dossier
+        ass = os.path.join(ROOT, "work", "_render", f"{name}.ass")
     if not (os.path.exists(mp4) and os.path.exists(ass)):
         print(f"{name}: pas encore rendu")
         return None
@@ -145,12 +147,26 @@ def check(name, sub=""):
     glob = float(np.median(errs))
     med, p90 = float(np.median(np.abs(errs))), float(np.percentile(np.abs(errs), 90))
     ok = med <= 0.2 and sil_pct <= 10 and abs(glob) <= 0.15  # p90 indicatif : voix du jeu non sous-titrees
-    png = os.path.join(ROOT, "work", "_render", f"{name}_sync.png")
+    png = os.path.join(os.path.dirname(ass), f"{name}_sync.png")
     draw(words, on, db, png, name)
     print(f"{name}: {'OK' if ok else 'A VERIFIER'}  reprise de parole -> mot : ecart median {med:.2f} s, pire 10 % {p90:.2f} s | "
           f"mots sur un blanc : {sil_pct:.0f} % | decalage global {glob:+.2f} s "
           f"({'sous-titres en retard' if glob > 0 else 'sous-titres en avance'} si non nul)")
+    save_result(f"{sub}/{name}" if sub else name, {"ok": bool(ok), "median": round(med, 2), "p90": round(p90, 2),
+                                                     "silence_pct": round(sil_pct, 1), "offset": round(glob, 2)})
     return ok
+
+
+def save_result(key, res):
+    """Garde le dernier verdict de chaque clip (lu par l'appli de gestion tools/app.py)."""
+    path = os.path.join(ROOT, "work", "_render", "sync.json")
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    data[key] = res
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=1)
 
 
 def main():
@@ -163,7 +179,7 @@ def main():
     sub = os.path.splitext(os.path.basename(cfg["source"]))[0]
     res = [check(c["name"], sub) for c in cfg["clips"] if not args.only or c["name"] == args.only]
     res = [r for r in res if r is not None]
-    print(f"\n{sum(res)}/{len(res)} clips OK. Images de controle : work/_render/<nom>_sync.png "
+    print(f"\n{sum(res)}/{len(res)} clips OK. Images de controle : work/_render/<video>/<nom>_sync.png "
           "(gris clair = voix, couleurs = mot surligne)")
 
 

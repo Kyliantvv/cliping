@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clips GTA VI</title>
+<style>
+@font-face { font-family: "Montserrat"; font-weight: 900; src: url("/static/fonts/Montserrat-Black.ttf"); }
+@font-face { font-family: "Montserrat"; font-weight: 800; src: url("/static/fonts/Montserrat-ExtraBold.ttf"); }
+:root {
+  --bg: #0f0818; --panel: #1a0f29; --panel2: #24163a; --line: #3a2656;
+  --text: #f4ecff; --muted: #a897c4;
+  --pink: #ff4fa3; --orange: #ff9a3c; --violet: #7a3cff; --teal: #19d3c5; --red: #ff5a6a; --yellow: #ffd34f;
+  --grad: linear-gradient(90deg, var(--pink), var(--orange));
+  --r: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { background: radial-gradient(1200px 500px at 80% -10%, #3b1450 0%, transparent 60%), radial-gradient(900px 400px at -10% 0%, #10304a 0%, transparent 60%), var(--bg); min-height: 100vh; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--panel2); border-radius: 10px; padding: 8px 14px; transition: transform .12s ease-out, background .15s; }
+button:hover { background: #2f1d4b; }
+button:active { transform: scale(.97); }
+button.primary { background: var(--grad); border: 0; color: #1a0b2e; font-weight: 800; }
+button.ghost { background: transparent; }
+input, select, textarea { background: #120a1f; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; outline: none; width: 100%; }
+input:focus, select:focus, textarea:focus { border-color: var(--pink); }
+label { font-size: 12px; color: var(--muted); display: block; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .06em; }
+.wrap { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
+header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.logo { font-family: Montserrat, sans-serif; font-weight: 900; font-size: 26px; letter-spacing: .02em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.logo small { display: block; font-size: 11px; letter-spacing: .25em; color: var(--muted); -webkit-text-fill-color: var(--muted); font-weight: 800; }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; min-width: 92px; }
+.stat b { display: block; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 22px; }
+.stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.next { display: grid; grid-template-columns: 120px 1fr auto; gap: 16px; align-items: center; background: linear-gradient(90deg, rgba(255,79,163,.18), rgba(255,154,60,.10)); border: 1px solid rgba(255,79,163,.45); border-radius: var(--r); padding: 14px; margin-bottom: 18px; }
+.next img { width: 120px; aspect-ratio: 9/16; object-fit: cover; border-radius: 10px; background: #000; }
+.next h3 { margin: 0 0 4px; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 18px; }
+.next .cap { color: var(--muted); font-size: 14px; max-width: 70ch; }
+.next .actions { display: flex; flex-direction: column; gap: 8px; }
+.kicker { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--orange); font-weight: 800; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+.chip.on { background: var(--text); color: #1a0b2e; border-color: var(--text); font-weight: 700; }
+.toolbar input[type=search] { width: 240px; }
+.toolbar select { width: auto; }
+.group-title { display: flex; align-items: baseline; gap: 10px; margin: 26px 0 10px; }
+.group-title h2 { margin: 0; font-family: Montserrat, sans-serif; font-weight: 900; font-size: 20px; }
+.group-title span { color: var(--muted); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; cursor: pointer; transition: transform .15s ease-out, border-color .15s; position: relative; }
+.card:hover { transform: translateY(-3px); border-color: var(--pink); }
+.card .media { position: relative; aspect-ratio: 9/16; background: #000; }
+.card .media img, .card .media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.card .media video { opacity: 0; transition: opacity .2s; }
+.card:hover .media video.ready { opacity: 1; }
+.badges { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; gap: 6px; pointer-events: none; }
+.badge { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: rgba(15,8,24,.8); backdrop-filter: blur(4px); }
+.badge.ok { color: var(--teal); } .badge.warn { color: var(--yellow); } .badge.none { color: var(--muted); }
+.dur { position: absolute; bottom: 8px; right: 8px; }
+.status { position: absolute; bottom: 8px; left: 8px; }
+.st-a_poster { color: var(--orange); } .st-programme { color: var(--violet); background: rgba(255,255,255,.9); } .st-poste { color: #1a0b2e; background: var(--teal); }
+.card .body { padding: 10px 12px 12px; }
+.card .hook { font-family: Montserrat, sans-serif; font-weight: 800; font-size: 13px; line-height: 1.25; text-transform: uppercase; }
+.card .meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; justify-content: space-between; }
+.card.missing .media::after { content: "Fichier absent (déplacé ou supprimé)\A Re-rendre pour le recréer"; white-space: pre; text-align: center; padding: 10px; position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.job { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(15,8,24,.75); font-weight: 800; color: var(--yellow); }
+.empty { color: var(--muted); padding: 40px; text-align: center; border: 1px dashed var(--line); border-radius: var(--r); }
+/* tiroir */
+.overlay { position: fixed; inset: 0; background: rgba(5,2,10,.7); backdrop-filter: blur(3px); display: none; z-index: 10; }
+.overlay.open { display: block; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(980px, 100%); background: var(--panel); border-left: 1px solid var(--line); z-index: 11; transform: translateX(100%); transition: transform .25s cubic-bezier(.2,.8,.2,1); display: grid; grid-template-columns: minmax(260px, 380px) 1fr; overflow: hidden; }
+.drawer.open { transform: none; }
+.drawer .player { background: #000; display: flex; align-items: center; justify-content: center; padding: 14px; }
+.drawer .player video { width: 100%; max-height: calc(100vh - 28px); aspect-ratio: 9/16; border-radius: 12px; background: #000; }
+.drawer .side { overflow-y: auto; padding: 18px 20px 30px; }
+.drawer h2 { font-family: Montserrat, sans-serif; font-weight: 900; font-size: 20px; margin: 4px 0 2px; text-transform: uppercase; }
+.drawer .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.sec { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.sec h4 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--orange); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; flex: 1; background: transparent; }
+.seg button.on { background: var(--grad); color: #1a0b2e; font-weight: 800; }
+.capbox { white-space: pre-wrap; background: #120a1f; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 14px; }
+.syncline { font-size: 13px; color: var(--muted); }
+.syncline b.ok { color: var(--teal); } .syncline b.warn { color: var(--yellow); }
+.close { position: absolute; top: 12px; right: 14px; z-index: 2; }
+.nav { display: flex; gap: 6px; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--text); color: #1a0b2e; padding: 10px 16px; border-radius: 999px; font-weight: 700; z-index: 30; transition: all .2s ease-out; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%); }
+.log { font: 12px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap; max-height: 160px; overflow: auto; color: var(--muted); margin-top: 8px; }
+kbd { border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-size: 11px; color: var(--muted); }
+@media (max-width: 900px) {
+  .drawer { grid-template-columns: 1fr; overflow-y: auto; }
+  .drawer .player video { max-height: 60vh; }
+  .drawer .side { overflow: visible; }
+  .next { grid-template-columns: 80px 1fr; }
+  .next img { width: 80px; }
+  .next .actions { grid-column: 1 / -1; flex-direction: row; }
+  .toolbar input[type=search] { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">CLIPS GTA VI<small>GESTION DES TIKTOKS</small></div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div id="next"></div>
+
+  <div class="toolbar">
+    <div class="chips" id="chips"></div>
+    <select id="creator"></select>
+    <select id="sort">
+      <option value="order">Ordre conseillé</option>
+      <option value="recent">Plus récents</option>
+      <option value="views">Plus de vues</option>
+      <option value="duration">Plus longs</option>
+    </select>
+    <input type="search" id="q" placeholder="Rechercher (hook, légende, streamer)…">
+    <span style="margin-left:auto;font-size:12px;color:var(--muted)"><kbd>/</kbd> chercher · <kbd>←</kbd><kbd>→</kbd> clip suivant · <kbd>C</kbd> copier · <kbd>Échap</kbd> fermer</span>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="player"><video id="player" controls playsinline></video></div>
+  <div class="side" id="side"></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+const S = { clips: [], filter: "tout", creator: "", q: "", sort: "order", open: null };
+const STATUS = { a_poster: "À poster", programme: "Programmé", poste: "Posté" };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtDur = (d) => d == null ? "–" : `${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, "0")}`;
+const fmtNum = (n) => n == null || n === "" ? "–" : Number(n) >= 1e6 ? (n / 1e6).toFixed(1).replace(".0", "") + " M" : Number(n) >= 1e3 ? (n / 1e3).toFixed(1).replace(".0", "") + " k" : String(n);
+const vurl = (c) => `/video/${encodeURIComponent(c.source)}/${encodeURIComponent(c.name)}?t=${c.mtime || 0}`;
+const turl = (c) => `/thumb/${encodeURIComponent(c.source)}/${encodeURIComponent(c.name)}?t=${c.mtime || 0}`;
+const syncState = (c) => !c.sync ? "none" : c.sync.ok ? "ok" : "warn";
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1800); }
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+async function load() {
+  const j = await api("/api/clips");
+  S.clips = j.clips;
+  render();
+  if (S.open) { const c = S.clips.find((x) => x.key === S.open); if (c) renderSide(c, false); }
+}
+
+function fullCaption(c) { return [c.caption, c.credit].filter(Boolean).join("\n"); }
+async function copyCaption(c) {
+  const txt = fullCaption(c);
+  if (!txt) return toast("Pas de légende pour ce clip");
+  try { await navigator.clipboard.writeText(txt); } catch { const ta = document.createElement("textarea"); ta.value = txt; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  toast("Légende copiée ✔");
+}
+async function setState(c, patch) {
+  await api("/api/state", { key: c.key, ...patch });
+  Object.assign(c, patch);
+  await load();
+}
+
+function visible() {
+  let list = S.clips.filter((c) => {
+    if (S.creator && c.source !== S.creator) return false;
+    if (S.filter === "a_poster" && c.status !== "a_poster") return false;
+    if (S.filter === "programme" && c.status !== "programme") return false;
+    if (S.filter === "poste" && c.status !== "poste") return false;
+    if (S.filter === "verifier" && syncState(c) !== "warn") return false;
+    if (S.q) { const h = (c.hook + " " + c.caption + " " + c.creator + " " + c.name).toLowerCase(); if (!h.includes(S.q.toLowerCase())) return false; }
+    return true;
+  });
+  const by = { order: (a, b) => a.order - b.order, recent: (a, b) => (b.mtime || 0) - (a.mtime || 0), views: (a, b) => (b.views || 0) - (a.views || 0), duration: (a, b) => (b.duration || 0) - (a.duration || 0) }[S.sort];
+  return list.sort(by);
+}
+
+function render() {
+  const all = S.clips, n = (f) => all.filter(f).length;
+  const views = all.reduce((s, c) => s + (Number(c.views) || 0), 0);
+  $("#stats").innerHTML = [
+    [all.filter((c) => c.video).length, "clips prêts"], [n((c) => c.status === "a_poster" && c.video), "à poster"],
+    [n((c) => c.status === "programme"), "programmés"], [n((c) => c.status === "poste"), "postés"],
+    [fmtNum(views), "vues totales"], [n((c) => syncState(c) === "warn"), "à vérifier"],
+  ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+
+  // prochain clip conseille : le plus recent des createurs, dans l'ordre conseille
+  const todo = all.filter((c) => c.status === "a_poster" && c.video).sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+  const latestSrc = todo[0]?.source;
+  const next = todo.filter((c) => c.source === latestSrc).sort((a, b) => a.order - b.order)[0];
+  $("#next").innerHTML = next ? `<div class="next">
+      <img src="${turl(next)}" alt="">
+      <div><div class="kicker">Prochain à poster</div><h3>${esc(next.hook)}</h3>
+        <div class="cap">${esc(next.caption || "Pas de légende")}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">${esc(next.creator)} · ${fmtDur(next.duration)}</div></div>
+      <div class="actions"><button class="primary" data-act="copy">Copier la légende</button>
+        <button data-act="posted">Marquer posté</button><button class="ghost" data-act="open">Voir</button></div></div>` : "";
+  if (next) $("#next").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const a = b.dataset.act; if (a === "copy") copyCaption(next); if (a === "posted") setState(next, { status: "poste" }).then(() => toast("Posté ✔")); if (a === "open") openClip(next.key);
+  });
+
+  const chips = [["tout", "Tous"], ["a_poster", "À poster"], ["programme", "Programmés"], ["poste", "Postés"], ["verifier", "Synchro à vérifier"]];
+  $("#chips").innerHTML = chips.map(([k, l]) => `<button class="chip ${S.filter === k ? "on" : ""}" data-f="${k}">${l}</button>`).join("");
+  $("#chips").querySelectorAll("button").forEach((b) => b.onclick = () => { S.filter = b.dataset.f; render(); });
+  const srcs = [...new Map(all.map((c) => [c.source, c.creator])).entries()];
+  $("#creator").innerHTML = `<option value="">Tous les streamers</option>` + srcs.map(([s, cr]) => `<option value="${esc(s)}" ${S.creator === s ? "selected" : ""}>${esc(cr)}</option>`).join("");
+
+  const list = visible();
+  if (!list.length) { $("#list").innerHTML = `<div class="empty">Aucun clip ici.</div>`; return; }
+  const groups = new Map();
+  for (const c of list) { if (!groups.has(c.source)) groups.set(c.source, []); groups.get(c.source).push(c); }
+  $("#list").innerHTML = [...groups.entries()].map(([src, cs]) => `
+    <div class="group-title"><h2>${esc(cs[0].creator)}</h2><span>${cs.length} clip${cs.length > 1 ? "s" : ""} · ${cs.filter((c) => c.status === "poste").length} posté${cs.filter((c) => c.status === "poste").length > 1 ? "s" : ""}</span></div>
+    <div class="grid">${cs.map(card).join("")}</div>`).join("");
+  $("#list").querySelectorAll(".card").forEach((el) => {
+    const c = S.clips.find((x) => x.key === el.dataset.key);
+    el.onclick = () => openClip(c.key);
+    if (!c.video) return;
+    const v = el.querySelector("video");
+    el.onmouseenter = () => { if (!v.src) { v.src = vurl(c) + "#t=" + Math.round((c.duration || 10) * 0.3); v.oncanplay = () => v.classList.add("ready"); } v.play().catch(() => {}); };
+    el.onmouseleave = () => v.pause();
+  });
+}
+function card(c) {
+  const s = syncState(c);
+  const sl = { ok: "Synchro OK", warn: "À vérifier", none: "Non vérifié" }[s];
+  return `<div class="card ${c.video ? "" : "missing"}" data-key="${esc(c.key)}">
+    <div class="media">${c.video ? `<img loading="lazy" src="${turl(c)}" alt=""><video muted loop playsinline preload="none"></video>` : ""}
+      <div class="badges"><span class="badge ${s}">${sl}</span>${c.views ? `<span class="badge">👁 ${fmtNum(c.views)}</span>` : ""}</div>
+      <span class="badge dur">${fmtDur(c.duration)}</span>
+      <span class="badge status st-${c.status}">${STATUS[c.status]}</span>
+      ${c.job ? `<div class="job">Rendu ${esc(c.job)}…</div>` : ""}</div>
+    <div class="body"><div class="hook">${esc(c.hook || c.name)}</div><div class="meta"><span>${esc(c.name)}</span></div></div></div>`;
+}
+
+function openClip(key) {
+  const c = S.clips.find((x) => x.key === key); if (!c) return;
+  S.open = key;
+  $("#overlay").classList.add("open"); $("#drawer").classList.add("open"); $("#drawer").setAttribute("aria-hidden", "false");
+  renderSide(c, true);
+}
+function closeClip() {
+  S.open = null; const p = $("#player"); p.pause(); p.removeAttribute("src"); p.load();
+  $("#overlay").classList.remove("open"); $("#drawer").classList.remove("open"); $("#drawer").setAttribute("aria-hidden", "true");
+}
+function step(d) {
+  const list = visible(); const i = list.findIndex((c) => c.key === S.open);
+  if (i < 0) return; const n = list[(i + d + list.length) % list.length]; openClip(n.key);
+}
+function renderSide(c, reloadVideo) {
+  const p = $("#player");
+  if (reloadVideo) { if (c.video) { p.src = vurl(c); p.play().catch(() => {}); } else { p.removeAttribute("src"); p.load(); } }
+  const s = c.sync;
+  const syncTxt = !s ? "Pas encore vérifiée." :
+    `<b class="${s.ok ? "ok" : "warn"}">${s.ok ? "OK" : "À vérifier"}</b> · écart médian ${s.median} s · mots sur un blanc ${s.silence_pct} % · décalage ${s.offset > 0 ? "+" : ""}${s.offset} s`;
+  $("#side").innerHTML = `
+    <button class="close ghost" id="x" aria-label="Fermer">✕</button>
+    <div class="nav"><button class="ghost" id="prev">← Précédent</button><button class="ghost" id="nextc">Suivant →</button></div>
+    <div class="kicker" style="margin-top:12px">${esc(c.creator)}</div>
+    <h2>${esc(c.hook || c.name)}</h2>
+    <div class="sub">${esc(c.name)} · ${fmtDur(c.duration)} · source ${esc(c.start)} → ${esc(c.end)}</div>
+
+    <div class="sec"><h4>Légende TikTok</h4>
+      <div class="capbox">${esc(fullCaption(c)) || "<i>Pas de légende dans legendes.txt</i>"}</div>
+      <div class="btns"><button class="primary" id="copy">Copier la légende</button>
+        ${c.video ? `<a href="${vurl(c)}" download="${esc(c.name)}.mp4"><button>Télécharger le mp4</button></a><button id="open">Ouvrir le dossier</button>` : ""}</div></div>
+
+    <div class="sec"><h4>Publication</h4>
+      <div class="seg" id="seg">${Object.entries(STATUS).map(([k, l]) => `<button data-s="${k}" class="${c.status === k ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="row" style="margin-top:10px">
+        <div><label>Programmé pour</label><input type="datetime-local" id="sched" value="${esc(c.scheduled)}"></div>
+        <div><label>Lien TikTok</label><input id="url" placeholder="https://www.tiktok.com/@…" value="${esc(c.url)}"></div></div>
+      <div class="row3" style="margin-top:10px">
+        <div><label>Vues</label><input id="views" type="number" min="0" value="${c.views ?? ""}"></div>
+        <div><label>Likes</label><input id="likes" type="number" min="0" value="${c.likes ?? ""}"></div>
+        <div><label>Posté le</label><input disabled value="${esc(c.posted_at || "–")}"></div></div>
+      <div style="margin-top:10px"><label>Notes</label><textarea id="notes" rows="2" placeholder="Idée de hook alternatif, retour du public…">${esc(c.notes)}</textarea></div>
+      <div class="btns"><button id="save">Enregistrer</button>${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener"><button class="ghost">Ouvrir sur TikTok ↗</button></a>` : ""}</div></div>
+
+    <div class="sec"><h4>Synchro des sous-titres</h4><div class="syncline">${syncTxt}</div></div>
+
+    <div class="sec"><h4>Modifier et re-rendre</h4>
+      <label>Hook (titre affiché)</label><input id="hook" value="${esc(c.hook)}" maxlength="80">
+      <div class="row3" style="margin-top:10px">
+        <div><label>Début (source)</label><input id="start" value="${esc(c.start)}"></div>
+        <div><label>Fin (source)</label><input id="end" value="${esc(c.end)}"></div>
+        <div><label>Texte de fin</label><input id="outro" value="${esc(c.outro)}" placeholder="(aucun)"></div></div>
+      <div class="btns"><button class="primary" id="rerender">Enregistrer et re-rendre</button><button id="rerender2">Re-rendre tel quel</button></div>
+      <div id="jobinfo" class="log"></div></div>`;
+  $("#x").onclick = closeClip; $("#prev").onclick = () => step(-1); $("#nextc").onclick = () => step(1);
+  $("#copy").onclick = () => copyCaption(c);
+  if ($("#open")) $("#open").onclick = () => api("/api/open", { key: c.key });
+  $("#seg").querySelectorAll("button").forEach((b) => b.onclick = () => setState(c, { status: b.dataset.s }).then(() => toast(STATUS[b.dataset.s] + " ✔")));
+  $("#save").onclick = () => setState(c, { url: $("#url").value.trim(), views: $("#views").value === "" ? null : Number($("#views").value), likes: $("#likes").value === "" ? null : Number($("#likes").value), notes: $("#notes").value, scheduled: $("#sched").value, ...($("#sched").value && c.status === "a_poster" ? { status: "programme" } : {}) }).then(() => toast("Enregistré ✔"));
+  $("#rerender").onclick = () => startRender(c, { hook: $("#hook").value, start: $("#start").value, end: $("#end").value, outro: $("#outro").value });
+  $("#rerender2").onclick = () => startRender(c, null);
+  if (c.job) pollJob(c);
+}
+async function startRender(c, edits) {
+  try {
+    if (edits) await api("/api/edit", { key: c.key, ...edits }); else await api("/api/render", { key: c.key });
+    toast("Rendu lancé (1 à 2 min)"); await load(); pollJob(c);
+  } catch (e) { toast("Erreur : " + e.message); }
+}
+async function pollJob(c) {
+  const { jobs } = await api("/api/jobs");
+  const j = jobs.find((x) => x.key === c.key);
+  const info = $("#jobinfo");
+  if (!j) return;
+  if (info && S.open === c.key) info.textContent = `Rendu : ${j.status}` + (j.log ? "\n" + j.log.trim().split("\n").slice(-6).join("\n") : "");
+  if (j.status === "en attente" || j.status === "en cours") setTimeout(() => pollJob(c), 2500);
+  else { toast(j.status === "fini" ? "Rendu terminé ✔" : "Échec du rendu"); const was = S.open; await load(); if (was === c.key) renderSide(S.clips.find((x) => x.key === c.key), true); }
+}
+
+$("#overlay").onclick = closeClip;
+$("#creator").onchange = (e) => { S.creator = e.target.value; render(); };
+$("#sort").onchange = (e) => { S.sort = e.target.value; render(); };
+$("#q").oninput = (e) => { S.q = e.target.value; render(); };
+document.addEventListener("keydown", (e) => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (e.key === "Escape") { if (typing) document.activeElement.blur(); else closeClip(); }
+  if (typing) return;
+  if (e.key === "/") { e.preventDefault(); $("#q").focus(); }
+  if (S.open && e.key === "ArrowRight") step(1);
+  if (S.open && e.key === "ArrowLeft") step(-1);
+  if (S.open && e.key.toLowerCase() === "c") copyCaption(S.clips.find((x) => x.key === S.open));
+});
+load();
+setInterval(() => { if (!S.open) load(); }, 20000);
+</script>
+</body>
+</html>

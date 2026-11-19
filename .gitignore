@@ -8,3 +8,5 @@ output/**/*.mp4
 models/
 __pycache__/
 *.pyc
+# Suivi perso des posts (appli de gestion)
+data/

@@ -508,10 +508,11 @@ def render(cfg, clip, enc):
     tl = Timeline(start, end, cuts)
 
     name = clip["name"]
-    tmp = os.path.join(ROOT, "work", "_render")
-    os.makedirs(tmp, exist_ok=True)
     # un sous-dossier par video source : evite que deux streamers avec un clip "01_decompte" s'ecrasent
-    out_dir = os.path.join(ROOT, "output", os.path.splitext(os.path.basename(cfg["source"]))[0])
+    sub = os.path.splitext(os.path.basename(cfg["source"]))[0]
+    tmp = os.path.join(ROOT, "work", "_render", sub)
+    os.makedirs(tmp, exist_ok=True)
+    out_dir = os.path.join(ROOT, "output", sub)
     os.makedirs(out_dir, exist_ok=True)
 
     hook_lines = wrap(clip["hook"].upper(), HOOK_CHARS) if clip.get("hook") else []

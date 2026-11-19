@@ -303,7 +303,17 @@ function renderSide(c, reloadVideo) {
         <div><label>Fin (source)</label><input id="end" value="${esc(c.end)}"></div>
         <div><label>Texte de fin</label><input id="outro" value="${esc(c.outro)}" placeholder="(aucun)"></div></div>
       <div class="btns"><button class="primary" id="rerender">Enregistrer et re-rendre</button><button id="rerender2">Re-rendre tel quel</button></div>
-      <div id="jobinfo" class="log"></div></div>`;
+      <div id="jobinfo" class="log"></div></div>
+
+    <div class="sec"><h4>Supprimer</h4>
+      <div class="syncline">Met le mp4 à la corbeille Windows (récupérable) et retire le clip de l'appli.</div>
+      <div class="btns"><button id="del" style="border-color:var(--red);color:var(--red)">Supprimer ce clip</button></div></div>`;
+  $("#del").onclick = async () => {
+    if (!confirm(`Supprimer « ${c.hook || c.name} » ?\nLe mp4 part à la corbeille Windows.`)) return;
+    try { const n = visible(); const i = n.findIndex((x) => x.key === c.key); await api("/api/delete", { key: c.key });
+      toast("Clip supprimé"); const nx = n[i + 1] || n[i - 1]; await load(); if (nx && nx.key !== c.key) openClip(nx.key); else closeClip(); }
+    catch (e) { toast("Erreur : " + e.message); }
+  };
   $("#x").onclick = closeClip; $("#prev").onclick = () => step(-1); $("#nextc").onclick = () => step(1);
   $("#copy").onclick = () => copyCaption(c);
   if ($("#open")) $("#open").onclick = () => api("/api/open", { key: c.key });

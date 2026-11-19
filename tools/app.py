@@ -91,7 +91,7 @@ def src_name(cfg):
 
 
 def find_video(sub, name):
-    for d in (os.path.join("output", sub), "output", os.path.join("output", "avant")):
+    for d in (os.path.join("output", sub),):
         p = os.path.join(ROOT, d, name + ".mp4")
         if os.path.exists(p):
             return p
@@ -101,7 +101,7 @@ def find_video(sub, name):
 def parse_legendes(sub):
     """legendes.txt -> {nom: {caption, source}} + ordre conseille + nom du createur."""
     path = None
-    for d in (os.path.join("output", sub), "output"):
+    for d in (os.path.join("output", sub),):
         p = os.path.join(ROOT, d, "legendes.txt")
         if os.path.exists(p):
             path = p
@@ -129,6 +129,14 @@ def parse_legendes(sub):
         else:
             i += 1
     return res, order, creator
+
+
+def to_recycle_bin(path):
+    """Corbeille Windows plutot que suppression definitive."""
+    ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
+          "$env:TRASH_PATH, 'OnlyErrorDialogs', 'SendToRecycleBin')")
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True,
+                   env={**os.environ, "TRASH_PATH": os.path.normpath(path)})
 
 
 def thumb(path, key):
@@ -159,9 +167,11 @@ def all_clips():
             key = f"{sub}/{name}"
             vid = find_video(sub, name)
             st = state.get(key, {})
+            if st.get("hidden"):
+                continue
             num = name[:2]
             out.append({
-                "key": key, "config": fn, "source": sub, "name": name, "creator": creator or sub,
+                "key": key, "config": fn, "source": sub, "name": name, "creator": creator or cfg.get("creator") or sub,
                 "hook": c.get("hook", ""), "start": c.get("start"), "end": c.get("end"),
                 "outro": c.get("outro", ""), "zooms": c.get("zooms", []),
                 "video": bool(vid), "duration": duration(vid) if vid else None,
@@ -343,6 +353,19 @@ class Handler(BaseHTTPRequestHandler):
                 save_json(cpath, cfg)
             job = queue_render(clip["config"], key) if data.get("render", True) else None
             return self.send_json({"ok": True, "job": job})
+        if path == "/api/delete":
+            # met le mp4 a la corbeille Windows (recuperable) et masque le clip dans l'appli
+            clip = self.clip_from_key(key)
+            if not clip:
+                return self.send_json({"error": "clip inconnu"}, 404)
+            vid = find_video(clip["source"], clip["name"])
+            if vid:
+                to_recycle_bin(vid)
+            with _lock:
+                state = load_json(STATE, {})
+                state.setdefault(key, {})["hidden"] = True
+                save_json(STATE, state)
+            return self.send_json({"ok": True, "trashed": bool(vid)})
         if path == "/api/render":
             clip = self.clip_from_key(key)
             if not clip:

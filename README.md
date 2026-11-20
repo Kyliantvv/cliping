@@ -66,6 +66,36 @@ relayés vers le serveur Python, qui doit tourner).
   « Créer » écrit `clips/<projet>.json`, ajoute les légendes dans `output/<projet>/legendes.txt` et lance les rendus.
   Les projets sont notés dans `data/projects.json` ; un stream déjà dans `input/` peut aussi être analysé sans lien.
 
+## Sur le VPS : lives enregistrés tout seuls (https://clips.dossierminute.fr)
+Le VPS (sans GPU) surveille, enregistre et repère ; le PC (GPU) transcrit et rend. L'appli est sur le VPS,
+protégée par mot de passe, jamais indexée (noindex + robots.txt).
+- **Streamers suivis** : onglet « Streamers suivis » de l'appli (ou `data/watchlist.json` sur le VPS), relu chaque
+  minute. Catégorie suivie par défaut : `Grand Theft Auto VI` (nom exact sur Twitch).
+- `tools/watcher.py` (service `clips-watcher`) : toutes les 60 s, qui est en live et dans quelle catégorie.
+  Live dans une catégorie suivie : enregistrement 720p (streamlink, pubs retirées) par morceaux de 30 min, plus le chat
+  en direct. Chaque morceau : volume + sons (YAMNet) + pics du chat, 3 meilleurs moments gardés (fenêtres de ~3 min
+  sans ré-encodage), puis le morceau est supprimé. Toutes les 3 h de live (ou à la fin) : les moments sont collés en
+  une vidéo courte `input/<chaine>_live_<date>_<heure>.mp4` + `work/<projet>/chat.json`, et une analyse part au PC.
+  Arrêt après 5 min hors ligne ou hors catégorie. Disque : enregistrement coupé sous 4 Go libres, vidéos courtes déjà
+  analysées supprimées du VPS après 3 jours (le PC les garde). Réglages : clés de `DEFAULTS` dans `watcher.py`,
+  surchargeables dans `data/watchlist.json`.
+- `tools/pc_worker.py` sur le PC (lancé à l'ouverture de session par `lancer_worker.bat`, raccourci dans le dossier
+  Démarrage) : prend les tâches du VPS (`data/tasks.json`), fait `analyze.py` / `render.py` / `check_sync.py` sur le
+  GPU, renvoie les résultats. PC éteint : les tâches attendent. Config : `data/worker.json` (url + jeton).
+- Ensuite comme avant : « Nouveau stream » › choisir les moments › hook › « Créer » (rendu fait par le PC).
+  « Envoyer sur l'iPhone » donne un lien HTTPS qui marche partout (20 min).
+- Logs : `journalctl -u clips-watcher -f`, `journalctl -u clips-app -f`. État en direct : `data/live.json`.
+
+Installation / mise à jour :
+```
+# sur le VPS (ssh -p 2222 ubuntu@213.32.16.246), dans ~/cliping (branche vps)
+git pull && bash deploy/setup_vps.sh
+.venv/bin/python tools/app.py --set-password     # une fois (ou pour changer le mot de passe)
+.venv/bin/python tools/app.py --worker-token     # jeton à mettre dans data/worker.json sur le PC
+# sur le PC : interface + modèle YAMNet vers le VPS, puis redémarrage des services
+deploy\push_vps.bat
+```
+
 ## Signaux utilisés pour trouver les moments
 | Signal | Outil | Pour quoi |
 |---|---|---|

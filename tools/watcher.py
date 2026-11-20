@@ -385,7 +385,8 @@ class Session:
         if msgs:
             act, laugh = signals.chat_curve(msgs, nb, BIN)
             act = np.convolve(act + 2 * laugh, np.ones(int(5 / BIN)), mode="same")
-            base = np.convolve(act, np.ones(int(120 / BIN)) / int(120 / BIN), mode="same")
+            bw = min(int(120 / BIN), nb)  # morceau court (fin de live) : fenetre de moyenne <= morceau
+            base = np.convolve(act, np.ones(bw) / bw, mode="same")
             chat_z = np.clip((act - base) / (np.sqrt(base) + 1), 0, None)
         score = excess + ev + 3.0 * chat_z
         smooth = np.convolve(score, np.ones(int(6 / BIN)) / int(6 / BIN), mode="same")

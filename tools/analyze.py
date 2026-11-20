@@ -223,7 +223,8 @@ def main():
     if msgs:
         act, laugh = signals.chat_curve(msgs, nb, BIN)
         act = np.convolve(act + 2 * laugh, np.ones(int(5 / BIN)), mode="same")
-        base = np.convolve(act, np.ones(int(120 / BIN)) / int(120 / BIN), mode="same")
+        bw = min(int(120 / BIN), nb)  # video de moins de 2 min : fenetre de moyenne = toute la video
+        base = np.convolve(act, np.ones(bw) / bw, mode="same")
         chat_z = np.clip((act - base) / (np.sqrt(base) + 1), 0, None)
         print(f"Chat : {len(msgs)} messages pris en compte")
 

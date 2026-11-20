@@ -68,6 +68,39 @@ def doubles(ass_path):
     return over, rep
 
 
+def isolated_voice(mp4, x):
+    """Voix du clip separee de la musique (UVR MDX-Net) : sinon la musique masque la voix pour le detecteur.
+    Garde en cache a cote du .mp4 ; renvoie l'audio d'origine si audio-separator n'est pas installe."""
+    cdir = os.path.join(ROOT, "work", "_render", "_voix")
+    os.makedirs(cdir, exist_ok=True)
+    key = os.path.basename(os.path.dirname(mp4)) + "__" + os.path.splitext(os.path.basename(mp4))[0]
+    cache = os.path.join(cdir, f"{key}.{int(os.path.getmtime(mp4))}.f32")
+    if os.path.exists(cache):
+        return np.fromfile(cache, np.float32)
+    try:
+        from audio_separator.separator import Separator
+    except ImportError:
+        return x
+    import tempfile
+    tmp = tempfile.mkdtemp()
+    mix = os.path.join(tmp, "mix.wav")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", mp4, "-vn", "-ac", "2", "-ar", "44100", mix], check=True)
+    sep = Separator(output_dir=tmp, model_file_dir=os.path.join(ROOT, "models", "uvr"),
+                    output_single_stem="Vocals", log_level=40)
+    sep.load_model("UVR-MDX-NET-Voc_FT.onnx")
+    voc = os.path.join(tmp, sep.separate(mix)[0])
+    r = subprocess.run(["ffmpeg", "-v", "error", "-i", voc, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+                       capture_output=True, check=True)
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+    for f in os.listdir(cdir):  # anciens caches du meme clip
+        if f.startswith(key + "."):
+            os.remove(os.path.join(cdir, f))
+    v = np.frombuffer(r.stdout, np.float32)
+    v.tofile(cache)
+    return v
+
+
 def voice(mp4):
     r = subprocess.run(["ffmpeg", "-v", "error", "-i", mp4, "-vn", "-ac", "1", "-ar", str(SR), "-f", "s16le", "-"],
                        capture_output=True)
@@ -82,7 +115,7 @@ def voice(mp4):
     import vad
     if vad.available():
         # modele de parole : la musique et les bruits du jeu ne comptent pas comme de la voix
-        p = vad.speech_prob(x)
+        p = vad.speech_prob(isolated_voice(mp4, x))
         idx = np.minimum(len(p) - 1, (np.arange(n) * HOP / vad.HOP).astype(int))
         return p[idx] >= 0.35, db
     thr = np.percentile(db, 90) - 20

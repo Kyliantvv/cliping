@@ -1,23 +1,45 @@
 {
  "source": "input/jltomy_vod_3h00_3h09.mp4",
- "captions": "work/jltomy_vod_3h00_3h09/captions.json",
+ "captions": "work/jltomy_vod_3h00_3h09/captions_fw.json",
  "creator": "JLTomy",
  "layout": "split",
  "cam_height": 640,
- "facecam": [34, 452, 408, 228],
+ "facecam": [
+  34,
+  452,
+  408,
+  228
+ ],
  "jumpcut": true,
  "fixes": {
   "GTA 6": "GTA VI",
   "Je forme juste": "Je farme juste",
-  "Foll !": ""
+  "Foll !": "",
+  "Je fais juste le": "Je farme juste le",
+  "j'tois allez": "j'dois aller",
+  "j'toois aller": "j'dois aller",
+  "Foll": ""
  },
- "highlight": ["trophée", "Jason", "Sortez-moi"],
+ "highlight": [
+  "trophée",
+  "Jason",
+  "Sortez-moi"
+ ],
  "clips": [
   {
    "name": "01_strip_club",
    "start": "00:06:55.5",
    "end": "00:08:16.5",
-   "hook": "JLTomy va au strip club de GTA VI"
+   "hook": "JLTomy va au strip club de GTA VI",
+   "snap": false
   }
+ ],
+ "drop": [
+  "Je suis tellement",
+  "heureuse de",
+  "avec toi, babe",
+  "C'est tout, toi",
+  "You",
+  "folle"
  ]
 }

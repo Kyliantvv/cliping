@@ -1,6 +1,6 @@
 {
  "source": "input/jltomy_live_20261120.mp4",
- "captions": "work/jltomy_live_20261120/captions.json",
+ "captions": "work/jltomy_live_20261120/captions_fw.json",
  "creator": "JLTomy",
  "layout": "split",
  "cam_height": 640,
@@ -18,7 +18,14 @@
   "C'est un crénère ça": "C'est un braquage ça",
   "Rockswood": "RP",
   "5M": "FiveM",
-  "Perde alors": "Merde alors"
+  "Perde alors": "Merde alors",
+  "coupe du": "coup du",
+  "couple du": "coup du",
+  "du goeuf": "des gaufres",
+  "goeuf": "gaufres",
+  "la cour,": "la course,",
+  "la cour ": "la course ",
+  "govre": "gaufres"
  },
  "highlight": [
   "coup du siècle",
@@ -45,7 +52,8 @@
      "01:15:34",
      "01:15:50"
     ]
-   ]
+   ],
+   "snap": false
   },
   {
    "name": "02_vigile_argent",
@@ -68,7 +76,7 @@
   {
    "name": "04_course_moto",
    "start": "01:42:30",
-   "end": "01:45:19.85",
+   "end": "01:45:19.4",
    "hook": "Lucia lui a niqué toute la course",
    "snap": false,
    "cuts": [
@@ -78,5 +86,10 @@
     ]
    ]
   }
+ ],
+ "drop": [
+  "mon mérine",
+  "vous, Rose",
+  "je vais me faire."
  ]
 }

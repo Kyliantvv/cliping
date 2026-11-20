@@ -124,7 +124,9 @@ def load_caps(path):
                     caps.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
-    return clean_caps(caps)
+    # segments avec l'heure de chaque mot (tools/retranscribe.py) : deja propres, on ne les retouche pas
+    precise = [c for c in caps if c.get("words")]
+    return sorted(clean_caps([c for c in caps if not c.get("words")]) + precise, key=lambda c: c["start"])
 
 
 def clean_caps(caps):
@@ -366,10 +368,12 @@ class VoiceMask:
         self.t0, self.on = start, np.zeros(0, bool)
         if not os.path.exists(wav_path):
             return
-        with wave.open(wav_path, "rb") as w:
-            sr = w.getframerate()
-            w.setpos(int(max(0, start) * sr))
-            data = np.frombuffer(w.readframes(int((end - start) * sr)), dtype=np.int16).astype(np.float32) / 32768
+        data, sr = self.isolated(os.path.dirname(wav_path), start, end)
+        if data is None:
+            with wave.open(wav_path, "rb") as w:
+                sr = w.getframerate()
+                w.setpos(int(max(0, start) * sr))
+                data = np.frombuffer(w.readframes(int((end - start) * sr)), dtype=np.int16).astype(np.float32) / 32768
         hop = int(sr * self.HOP)
         nf = len(data) // hop
         if nf < 10:
@@ -390,6 +394,20 @@ class VoiceMask:
             if not on[i] and on[max(0, i - k):i].any() and on[i + 1:i + 1 + k].any():
                 on[i] = True
         self.on = on
+
+    @staticmethod
+    def isolated(work, start, end):
+        """Voix isolee de la musique par tools/retranscribe.py (work/<video>/_sep/voc_<debut>_<fin>.f32), si elle couvre le passage."""
+        sep = os.path.join(work, "_sep")
+        if not os.path.isdir(sep):
+            return None, None
+        for f in os.listdir(sep):
+            m = re.fullmatch(r"voc_([\d.]+)_([\d.]+)\.f32", f)
+            if m and float(m.group(1)) <= max(0, start) + 0.05 and float(m.group(2)) >= end - 0.05:
+                x = np.fromfile(os.path.join(sep, f), np.float32)
+                i = int((max(0, start) - float(m.group(1))) * 16000)
+                return x[i:i + int((end - max(0, start)) * 16000)], 16000
+        return None, None
 
     def frames(self, a, b):
         i = max(0, int((a - self.t0) / self.HOP))
@@ -523,15 +541,39 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     cap_ev = []
     floor = -1e9
     caps = [c for c in caps if c["end"] / 1000.0 > tl.start and c["start"] / 1000.0 < tl.end]
-    caps = recale_runs(caps, vm)
+    if not any(c.get("words") for c in caps):
+        caps = recale_runs(caps, vm)
     for ci, c in enumerate(caps):
         s, e = c["start"] / 1000.0, c["end"] / 1000.0
+        if any(d.lower() in c["text"].lower() for d in cfg.get("drop", []) + clip.get("drop", [])):
+            continue  # ligne a retirer (dialogue du jeu traduit, mot invente par Whisper...)
         text = esc(fix_text(c["text"].strip(), cfg).upper())
+        # "GAGNE !" reste un seul mot (sinon le "!" s'allume tout seul et decale les temps des mots)
+        text = re.sub(r" ([!?:;]+)", "\1", text)
         if not text:
             continue
         prev_e = caps[ci - 1]["end"] / 1000.0 if ci else -1e9
         next_s = caps[ci + 1]["start"] / 1000.0 if ci + 1 < len(caps) else 1e9
-        words = align_words(text, s, e, vm, prev_e - 0.1, next_s + 0.1)
+        if c.get("words") and len(text.split()) == len(c["words"]):
+            words = [(w, ws / 1000.0, we / 1000.0) for w, (_, ws, we) in zip(text.split(), c["words"])]
+            # recale sur la voix isolee (Whisper peut se tromper de quelques dixiemes sur un cri)
+            al = align_words(text, s, e, vm, prev_e - 0.05, next_s + 0.05)
+            if vm is not None and len(vm.on) and al != word_times(text, s, e):
+                words = [(w, (a1 + a2) / 2, (b1 + b2) / 2) for (w, a1, b1), (_, a2, b2) in zip(words, al)]
+            # Whisper place souvent le 1er mot d'une phrase un peu tard : on le cale sur le debut de la voix
+            if vm is not None and len(vm.on):
+                i, j = vm.frames(max(words[0][1] - 0.8, prev_e), words[0][1] + 0.05)
+                seg = vm.on[i:j]
+                starts = [k for k in range(1, len(seg)) if seg[k] and not seg[k - 1]
+                          and not vm.on[max(0, i + k - 13):i + k].any()]
+                if starts:
+                    t0 = vm.t0 + (i + starts[-1]) * vm.HOP
+                    w0, _, b0 = words[0]
+                    words[0] = (w0, t0, max(b0, t0 + 0.08))
+        elif c.get("words"):
+            words = word_times(text, s, e)
+        else:
+            words = align_words(text, s, e, vm, prev_e - 0.1, next_s + 0.1)
         # les mots d'une ligne viennent toujours apres ceux de la ligne d'avant : sinon, quand Whisper coupe une
         # phrase en deux segments presque simultanes, les deux lignes alternent a l'ecran
         fixed, t = [], floor
@@ -572,7 +614,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if k + 1 < len(cap_ev):
             b = min(b, cap_ev[k + 1][0])
         if b - a >= 0.02:
-            ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Cap,,0,0,0,,{txt}")
+            ev.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Cap,,0,0,0,,{txt.replace(chr(7), ' ')}")
     with open(path, "w", encoding="utf-8-sig") as f:
         f.write(head + "\n".join(ev) + "\n")
     return hd
@@ -675,7 +717,10 @@ def render(cfg, clip, enc):
     fc = ""
     vsrc, asrc = "[0:v]", "[0:a]"
     if sel:
-        fc += f"[0:v]select='{sel}',setpts=N/FRAME_RATE/TB[vin];[0:a]aselect='{sel}',asetpts=N/SR/TB[ain];"
+        # fps d'abord : les enregistrements de live (.ts remuxes) annoncent 30 i/s mais en contiennent 60,
+        # et setpts=N/FRAME_RATE mettait alors la video au ralenti (2x plus lente que le son)
+        fc += (f"[0:v]fps={FPS},select='{sel}',setpts=N/{FPS}/TB[vin];"
+               f"[0:a]aselect='{sel}',asetpts=N/SR/TB[ain];")
         vsrc, asrc = "[vin]", "[ain]"
     fc += video_chain(cfg, vsrc)
     chain = f";[v0]fps={FPS}"

@@ -58,6 +58,13 @@ def doubles(ass_path):
     over = [a for (a, _, _, _), (_, pb, _, _) in zip(ev[1:], ev) if a < pb - 0.03]
     lines = [(a, t) for a, _, t, new in ev if new]
     rep = [(a, t) for (a, t), (pa, pt) in zip(lines[1:], lines) if t == pt and a - pa < 4]
+    # deux lignes qui alternent (A, B, A en moins de 3 s) : texte qui clignote
+    seq = []
+    for a, _, t, _ in ev:
+        if not seq or seq[-1][1] != t:
+            seq.append((a, t))
+    rep += [(a, "alterne avec : " + seq[k - 1][1]) for k, (a, t) in enumerate(seq)
+            if k >= 2 and t == seq[k - 2][1] and a - seq[k - 2][0] < 3]
     return over, rep
 
 

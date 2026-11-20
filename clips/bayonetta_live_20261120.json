@@ -1,0 +1,64 @@
+{
+ "source": "input/bayonetta_live_20261120.mp4",
+ "captions": "work/bayonetta_live_20261120/captions.json",
+ "creator": "Bayonetta_TV",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [
+  0,
+  0,
+  420,
+  350
+ ],
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  " de Paris 2": ""
+ },
+ "highlight": [
+  "physique",
+  "Red Dead",
+  "Brian",
+  "pick-up",
+  "tuer",
+  "GTA VI"
+ ],
+ "clips": [
+  {
+   "name": "01_physique_red_dead",
+   "start": "00:28:31",
+   "end": "00:29:43",
+   "hook": "La physique de GTA VI a tout changé",
+   "zooms": [
+    "00:28:42"
+   ],
+   "impacts": [
+    "00:29:19"
+   ]
+  },
+  {
+   "name": "02_pickup_dans_leau",
+   "start": "00:44:41",
+   "end": "00:46:12",
+   "hook": "Elle saute du pont avec le pick-up",
+   "zooms": [
+    "00:45:09"
+   ],
+   "impacts": [
+    "00:45:31"
+   ]
+  },
+  {
+   "name": "03_presque_tire",
+   "start": "00:52:50",
+   "end": "00:54:10",
+   "hook": "Elle a failli l'exécuter",
+   "zooms": [
+    "00:53:31"
+   ],
+   "impacts": [
+    "00:53:53"
+   ]
+  }
+ ]
+}

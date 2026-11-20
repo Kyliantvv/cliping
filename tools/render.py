@@ -387,6 +387,46 @@ class VoiceMask:
         return i, j
 
 
+def recale_runs(caps, vm, max_shift=1.5):
+    """Whisper decale parfois toute une suite de segments (jusqu'a ~1.5 s) : le recalage mot par mot (+-0.3 s)
+    ne suffit pas, et les mots tombent dans un blanc (supprime ensuite par les jump cuts).
+    Pour chaque suite de segments colles, on cherche le decalage qui met le plus de texte sur de la voix."""
+    if vm is None or not len(vm.on):
+        return caps
+    out = [dict(c) for c in caps]
+    runs, cur = [], []
+    for k, c in enumerate(out):
+        if cur and c["start"] - out[cur[-1]]["end"] > 500:
+            runs.append(cur)
+            cur = []
+        cur.append(k)
+    if cur:
+        runs.append(cur)
+
+    def cover(run, d):
+        tot = on = 0
+        for k in run:
+            i, j = vm.frames(out[k]["start"] / 1000 + d, out[k]["end"] / 1000 + d)
+            if j > i:
+                tot += j - i
+                on += int(vm.on[i:j].sum())
+        return on / tot if tot else 0.0
+
+    for r, run in enumerate(runs):
+        lo = (out[runs[r - 1][-1]]["end"] - out[run[0]]["start"]) / 1000 if r else -max_shift
+        hi = (out[runs[r + 1][0]]["start"] - out[run[-1]]["end"]) / 1000 if r + 1 < len(runs) else max_shift
+        shifts = [d / 20 for d in range(int(-max_shift * 20), int(max_shift * 20) + 1) if lo <= d / 20 <= hi]
+        if not shifts:
+            continue
+        base = cover(run, 0.0)
+        best = max(shifts, key=lambda d: (round(cover(run, d), 2), -abs(d)))
+        if cover(run, best) - base >= 0.1:
+            for k in run:
+                out[k]["start"] += int(best * 1000)
+                out[k]["end"] += int(best * 1000)
+    return out
+
+
 def align_words(text, s, e, vm, prev_end=-1e9, next_start=1e9):
     """Mots du segment [s, e] places sur les moments ou la voix est vraiment presente.
 
@@ -471,7 +511,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     karaoke = clip.get("karaoke", cfg.get("karaoke", True))
     cap_ev = []
+    floor = -1e9
     caps = [c for c in caps if c["end"] / 1000.0 > tl.start and c["start"] / 1000.0 < tl.end]
+    caps = recale_runs(caps, vm)
     for ci, c in enumerate(caps):
         s, e = c["start"] / 1000.0, c["end"] / 1000.0
         text = esc(fix_text(c["text"].strip(), cfg).upper())
@@ -480,6 +522,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         prev_e = caps[ci - 1]["end"] / 1000.0 if ci else -1e9
         next_s = caps[ci + 1]["start"] / 1000.0 if ci + 1 < len(caps) else 1e9
         words = align_words(text, s, e, vm, prev_e - 0.1, next_s + 0.1)
+        # les mots d'une ligne viennent toujours apres ceux de la ligne d'avant : sinon, quand Whisper coupe une
+        # phrase en deux segments presque simultanes, les deux lignes alternent a l'ecran
+        fixed, t = [], floor
+        for w, a, b in words:
+            a = max(a, t)
+            fixed.append((w, a, max(b, a + 0.08)))
+            t = a + 0.06
+        words = fixed
+        floor = words[-1][1] + 0.1
         # chaque mot reste affiche jusqu'au suivant (pas de clignotement), la ligne jusqu'a la fin de la voix + 0.3 s
         words = [(w, a, max(b, words[k + 1][1]) if k + 1 < len(words) and words[k + 1][1] - b < 0.6 else b)
                  for k, (w, a, b) in enumerate(words)]

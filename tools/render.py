@@ -43,6 +43,9 @@ import wave
 
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vad  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 W, H, FPS = 1080, 1920, 30
 FONTS_DIR = os.path.join(ROOT, "assets", "fonts")
@@ -370,6 +373,13 @@ class VoiceMask:
         hop = int(sr * self.HOP)
         nf = len(data) // hop
         if nf < 10:
+            return
+        if sr == vad.SR and vad.available():
+            # modele de parole : ignore la musique et les bruits du jeu (un seuil de volume les prend pour de la voix)
+            p = vad.speech_prob(data)
+            if len(p):
+                idx = np.minimum(len(p) - 1, (np.arange(nf) * self.HOP / vad.HOP).astype(int))
+                self.on = p[idx] >= 0.35
             return
         db = 20 * np.log10(np.sqrt(np.mean(data[: nf * hop].reshape(nf, hop) ** 2, axis=1)) + 1e-9)
         thr = max(-50.0, min(-30.0, np.percentile(db, 90) - 22))

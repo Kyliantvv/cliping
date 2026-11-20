@@ -79,6 +79,12 @@ def voice(mp4):
     sp = np.abs(np.fft.rfft(fr * np.hanning(hop), axis=1)) ** 2
     f = np.fft.rfftfreq(hop, 1 / SR)
     db = 10 * np.log10(sp[:, (f > 250) & (f < 3500)].sum(axis=1) + 1e-9)
+    import vad
+    if vad.available():
+        # modele de parole : la musique et les bruits du jeu ne comptent pas comme de la voix
+        p = vad.speech_prob(x)
+        idx = np.minimum(len(p) - 1, (np.arange(n) * HOP / vad.HOP).astype(int))
+        return p[idx] >= 0.35, db
     thr = np.percentile(db, 90) - 20
     on = db >= thr
     for i in range(1, n - 1):  # micro-trous entre syllabes

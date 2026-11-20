@@ -1,0 +1,82 @@
+{
+ "source": "input/jltomy_live_20261120.mp4",
+ "captions": "work/jltomy_live_20261120/captions.json",
+ "creator": "JLTomy",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [
+  34,
+  452,
+  408,
+  228
+ ],
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "Le coupe du siècle": "Le coup du siècle",
+  "coupe du siècle": "coup du siècle",
+  "C'est un crénère ça": "C'est un braquage ça",
+  "Rockswood": "RP",
+  "5M": "FiveM",
+  "Perde alors": "Merde alors"
+ },
+ "highlight": [
+  "coup du siècle",
+  "argent",
+  "laser",
+  "Magnifique",
+  "gagné",
+  "Lucia",
+  "Rockstar",
+  "FiveM"
+ ],
+ "clips": [
+  {
+   "name": "01_coup_du_siecle",
+   "start": "01:12:37",
+   "end": "01:16:14",
+   "hook": "Le premier braquage de Jason et Lucia",
+   "cuts": [
+    [
+     "01:13:58",
+     "01:14:50"
+    ],
+    [
+     "01:15:34",
+     "01:15:50"
+    ]
+   ]
+  },
+  {
+   "name": "02_vigile_argent",
+   "start": "00:31:56",
+   "end": "00:33:52",
+   "hook": "Il tabasse un vigile et perd tout son argent"
+  },
+  {
+   "name": "03_laser_sismique",
+   "start": "00:52:47",
+   "end": "00:54:42",
+   "hook": "Le gang l'a démonté pour 7000 $",
+   "cuts": [
+    [
+     "00:53:50",
+     "00:54:23"
+    ]
+   ]
+  },
+  {
+   "name": "04_course_moto",
+   "start": "01:42:30",
+   "end": "01:45:19.85",
+   "hook": "Lucia lui a niqué toute la course",
+   "snap": false,
+   "cuts": [
+    [
+     "01:43:18.6",
+     "01:43:20.3"
+    ]
+   ]
+  }
+ ]
+}

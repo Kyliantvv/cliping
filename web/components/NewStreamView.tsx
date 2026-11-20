@@ -6,7 +6,7 @@ import MomentsPicker from "./MomentsPicker";
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
-export default function NewStreamView({ onCreated }: { onCreated: () => void }) {
+export default function NewStreamView({ onCreated, remote = false }: { onCreated: () => void; remote?: boolean }) {
   const { toast } = useUI();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -85,7 +85,11 @@ export default function NewStreamView({ onCreated }: { onCreated: () => void }) 
         </div>
         <div className="btn-row">
           <button className="btn primary" disabled={sending} onClick={go}><Icon name="download" size={16} /> Télécharger et analyser</button>
-          <span className="muted small">Compte 20 à 40 min pour 2 h de stream. Ça continue même si tu fermes la page. VOD réservée aux abonnés : la télécharger toi-même dans input/.</span>
+          <span className="muted small">
+            {remote
+              ? "Le PC télécharge la VOD et fait l'analyse (il doit être allumé). Les lives des streamers suivis arrivent ici tout seuls."
+              : "Compte 20 à 40 min pour 2 h de stream. Ça continue même si tu fermes la page. VOD réservée aux abonnés : la télécharger toi-même dans input/."}
+          </span>
         </div>
       </section>
 
@@ -96,6 +100,7 @@ export default function NewStreamView({ onCreated }: { onCreated: () => void }) 
               {(j.status === "en cours" || j.status === "en attente") && <span className="spinner" />} {j.status}
             </span>
             <b>{j.key}</b>
+            {(j as Job & { auto?: boolean }).auto && <span className="pill-s violet">live auto</span>}
             {j.status === "fini" && <button className="btn primary" style={{ marginLeft: "auto" }} onClick={() => setOpen(j.key)}>Choisir les moments</button>}
           </div>
           <pre className="joblog">{j.log.trim().split("\n").slice(-12).join("\n") || "En attente…"}</pre>
@@ -112,7 +117,7 @@ export default function NewStreamView({ onCreated }: { onCreated: () => void }) 
               : <div className="proj-ph" />}
             <div className="proj-body">
               <b>{p.creator}</b>
-              <span className="muted small truncate">{p.name} · {plural(p.used.length, "clip créé", "clips créés")}</span>
+              <span className="muted small truncate">{p.auto && "Live auto · "}{p.name} · {plural(p.used.length, "clip créé", "clips créés")}</span>
             </div>
             {p.analyzed && p.video
               ? <button className="btn" onClick={() => setOpen(p.name)}>Choisir des moments</button>

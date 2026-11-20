@@ -55,6 +55,9 @@ export type Project = {
   facecam: number[] | null;
   layout: string;
   used: [string, string, string][];
+  auto?: boolean;
+  title?: string;
+  source_here?: boolean;
 };
 
 export type Candidate = {
@@ -69,6 +72,21 @@ export type Candidate = {
   caption?: string;
 };
 
+export type LiveStreamer = {
+  display: string; exists: boolean; live: boolean; game: string | null; title: string | null;
+  recording: boolean; since: number | null; moments: number; processing: boolean;
+};
+
+export type Watch = {
+  remote: boolean;
+  streamers: string[];
+  categories: string[];
+  live: { updated?: number; free_gb?: number; low_disk?: boolean; streamers?: Record<string, LiveStreamer> };
+  watcher_ok: boolean;
+  worker: { seen: number | null; online: boolean; name: string };
+  tasks_pending: number;
+};
+
 export type IphoneSettings = { iphone_dir: string | null; saved: string | null; detected: string[] };
 
 export async function api<T = Record<string, unknown>>(path: string, body?: unknown): Promise<T> {
@@ -78,6 +96,10 @@ export async function api<T = Record<string, unknown>>(path: string, body?: unkn
       ? { cache: "no-store" }
       : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
   );
+  if (r.status === 401 && typeof window !== "undefined") {
+    window.location.href = "/login"; // session expirée (appli sur le VPS)
+    throw new Error("connexion requise");
+  }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error((j as { error?: string }).error || r.statusText);
   return j as T;

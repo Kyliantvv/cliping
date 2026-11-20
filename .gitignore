@@ -10,3 +10,5 @@ __pycache__/
 *.pyc
 # Suivi perso des posts (appli de gestion)
 data/
+# Enregistrements de lives en cours (VPS)
+rec/

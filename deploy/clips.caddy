@@ -1,0 +1,31 @@
+clips.dossierminute.fr {
+	encode zstd gzip {
+		match {
+			header Content-Type application/json*
+			header Content-Type text/*
+		}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		# site prive : jamais indexe par les moteurs de recherche
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		-Server
+	}
+	# le PC renvoie des clips rendus (100-300 Mo)
+	request_body {
+		max_size 600MiB
+	}
+	reverse_proxy 127.0.0.1:8765 {
+		# envois / telechargements de videos : pas de coupure au bout de 30 s
+		transport http {
+			read_timeout 15m
+			write_timeout 15m
+		}
+	}
+	log {
+		output file /var/log/caddy/clips.log
+	}
+}

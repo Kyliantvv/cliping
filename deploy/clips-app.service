@@ -1,0 +1,20 @@
+[Unit]
+Description=Clips GTA VI - appli web (derriere Caddy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/cliping
+Environment=CLIPS_REMOTE=1
+Environment=CLIPS_PUBLIC_URL=https://clips.dossierminute.fr
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/cliping/.venv/bin/python tools/app.py --host 127.0.0.1 --port 8765 --no-open
+Restart=always
+RestartSec=5
+MemoryMax=600M
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

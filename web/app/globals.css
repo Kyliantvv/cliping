@@ -328,6 +328,34 @@ dialog::backdrop { background: rgba(5, 2, 10, 0.72); backdrop-filter: blur(4px);
 .why { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(46, 230, 208, 0.1); color: var(--teal); }
 
 /* ---------- responsive ---------- */
+/* streamers suivis (mode VPS) */
+.ok-txt { color: var(--teal); } .warn-txt { color: var(--yellow); } .err-txt { color: var(--red); }
+.status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.status-grid > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.status-grid .field-label { margin: 0 0 2px; }
+.streamers { list-style: none; margin: 0; padding: 0; }
+.streamers li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.streamers li:last-child { border-bottom: 0; }
+.st-name { font-weight: 800; color: var(--text); text-decoration: none; min-width: 120px; }
+.st-name:hover { text-decoration: underline; }
+.st-state { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.live-dot.rec { color: var(--red); font-size: 13px; font-weight: 700; }
+.rec-badge { color: var(--red) !important; font-weight: 800; }
+.inline-add { display: flex; gap: 10px; align-items: flex-end; margin-top: 8px; }
+.inline-add .field { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-2); font-size: 13px; font-weight: 700; }
+.chip button { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: -4px -6px -4px 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.chip button:hover { background: var(--surface-3); color: var(--text); }
+.foot-remote { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.foot-remote a { color: var(--muted); text-decoration: none; display: inline-flex; gap: 4px; align-items: center; }
+.foot-remote a:hover { color: var(--text); }
+@media (max-width: 640px) {
+  .status-grid { grid-template-columns: 1fr; }
+  .inline-add { flex-direction: column; align-items: stretch; }
+  .st-name { min-width: 0; }
+}
+
 @media (max-width: 1100px) {
   .moments { grid-template-columns: 1fr; }
   .stick { position: static; }

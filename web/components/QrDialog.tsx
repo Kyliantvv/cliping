@@ -118,12 +118,17 @@ export default function QrDialog({ clip, onClose, onIcloud, onDownloaded }: {
 
       {share && !err && (
         <p className="muted small">
-          iPhone sur le <b>même Wi-Fi</b> que le PC. Lien valable {Math.floor(left / 60)} min {String(left % 60).padStart(2, "0")} s.
+          {share.url.startsWith("https://")
+            ? <>Lien sécurisé, marche partout (4G comprise).</>
+            : <>iPhone sur le <b>même Wi-Fi</b> que le PC.</>}{" "}
+          Lien valable {Math.floor(left / 60)} min {String(left % 60).padStart(2, "0")} s.
         </p>
       )}
 
       <div className="dialog-actions">
-        <button className="btn ghost" onClick={() => { onIcloud(clip); dlg.current?.close(); }}>Envoyer via iCloud</button>
+        {share?.url.startsWith("https://")
+          ? <a className="btn ghost" href={share.url} target="_blank" rel="noreferrer">Ouvrir le lien (sur ce téléphone)</a>
+          : <button className="btn ghost" onClick={() => { onIcloud(clip); dlg.current?.close(); }}>Envoyer via iCloud</button>}
         <button className="btn primary" onClick={() => dlg.current?.close()}>{done ? "Terminé" : "Fermer"}</button>
       </div>
     </dialog>

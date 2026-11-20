@@ -1,0 +1,24 @@
+[Unit]
+Description=Clips GTA VI - surveillance des lives Twitch et enregistrement
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/cliping
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/cliping/.venv/bin/python tools/watcher.py
+Restart=always
+RestartSec=10
+# le VPS fait tourner d'autres services : le watcher passe apres eux
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=1200M
+NoNewPrivileges=true
+PrivateTmp=true
+# a l'arret : ffmpeg ferme proprement le morceau en cours
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -14,13 +14,22 @@ Ce qu'elle fait :
   - nouveau stream : lien Twitch -> telechargement + analyse en arriere-plan -> moments proposes,
     on coche, on ecrit le hook, on trace la facecam -> config + legendes + rendus
 Etat : data/state.json, data/settings.json, data/projects.json (pas de base de donnees).
+
+Mode VPS (variable CLIPS_REMOTE=1, voir deploy/) : l'appli tourne sur le VPS derriere Caddy (HTTPS), protegee
+par mot de passe (data/auth.json, cree par « python tools/app.py --set-password »). Les taches lourdes
+(analyse Whisper, rendus) ne tournent pas sur le VPS : elles partent dans data/tasks.json et le PC les fait
+(tools/pc_worker.py, qui passe par /api/worker/* avec un jeton). Onglet « Streamers suivis » : data/watchlist.json,
+etat en direct dans data/live.json (ecrit par tools/watcher.py).
 """
 import argparse
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import queue
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -39,6 +48,17 @@ SYNC = os.path.join(ROOT, "work", "_render", "sync.json")
 SETTINGS = os.path.join(ROOT, "data", "settings.json")
 PROJECTS = os.path.join(ROOT, "data", "projects.json")
 PY = sys.executable
+AUTH = os.path.join(ROOT, "data", "auth.json")
+SESSIONS = os.path.join(ROOT, "data", "sessions.json")
+WATCHLIST = os.path.join(ROOT, "data", "watchlist.json")
+LIVE = os.path.join(ROOT, "data", "live.json")
+TRASH = os.path.join(ROOT, "data", "trash")
+REMOTE = os.environ.get("CLIPS_REMOTE") == "1"           # appli sur le VPS, calculs sur le PC
+PUBLIC_URL = os.environ.get("CLIPS_PUBLIC_URL", "").rstrip("/")  # ex. https://clips.dossierminute.fr
+SESSION_DAYS = 30
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import tasks  # noqa: E402
 
 _lock = threading.Lock()
 _jobs = []          # [{id, key, kind, status, log, started, ended}]
@@ -146,6 +166,8 @@ def to_recycle_bin(paths):
         paths = [paths]
     if not paths:
         return []
+    if os.name != "nt":
+        return to_trash_dir(paths)
     # chaque fichier est tente plusieurs fois : un mp4 encore lu par le navigateur se libere en 1 ou 2 s
     ps = ("Add-Type -AssemblyName Microsoft.VisualBasic; $fs = [Microsoft.VisualBasic.FileIO.FileSystem]; "
           "foreach ($p in ($env:TRASH_PATHS -split \"`n\")) { if (-not $p) { continue }; $ok = $false; "
@@ -158,6 +180,27 @@ def to_recycle_bin(paths):
                        encoding="utf-8", errors="replace",
                        env={**os.environ, "TRASH_PATHS": "\n".join(os.path.normpath(p) for p in paths)})
     return [l.split("|", 1)[1].strip() for l in r.stdout.splitlines() if l.startswith("ECHEC|")]
+
+
+def to_trash_dir(paths):
+    """Hors Windows (VPS) : deplace dans data/trash/<date>/ (garde 7 jours) au lieu de supprimer."""
+    dest = os.path.join(TRASH, time.strftime("%Y%m%d_%H%M%S"))
+    failed = []
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        rel = os.path.relpath(p, ROOT)
+        d = os.path.join(dest, rel)
+        try:
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            shutil.move(p, d)
+        except OSError:
+            failed.append(p)
+    for old in os.listdir(TRASH) if os.path.isdir(TRASH) else []:
+        op = os.path.join(TRASH, old)
+        if time.time() - os.path.getmtime(op) > 7 * 86400:
+            shutil.rmtree(op, ignore_errors=True)
+    return failed
 
 
 def remove_legendes(sub, names):
@@ -329,11 +372,31 @@ def public_job(job):
     return {k: v for k, v in job.items() if not k.startswith("_")}
 
 
+def remote_step(kind, project, **fields):
+    """Etape faite par le PC (mode VPS) : ajoute une tache dans data/tasks.json et attend qu'il l'ait finie."""
+    def step(job):
+        t = tasks.add(kind, project, **fields)
+        job["task"] = t["id"]
+        _log(job, "En attente du PC (tools/pc_worker.py)...\n")
+        base = job["log"]
+
+        def mirror(t):
+            job["log"] = (base + t["log"])[-6000:]
+        t = tasks.wait(t["id"], mirror)
+        if t["status"] != "fini":
+            raise RuntimeError(f"le PC a signale une erreur ({kind})")
+    return step
+
+
 def queue_render(config, key):
     cfg_path = os.path.join("clips", config)
     name = key.split("/", 1)[1]
-    return add_job(_job_q, "render", key, [[PY, "tools/render.py", cfg_path, "--only", name],
-                                           [PY, "tools/check_sync.py", cfg_path, "--only", name]], config=config)
+    if REMOTE:
+        steps = [remote_step("render", config[:-5] if config.endswith(".json") else config, config=config, clip=name)]
+    else:
+        steps = [[PY, "tools/render.py", cfg_path, "--only", name],
+                 [PY, "tools/check_sync.py", cfg_path, "--only", name]]
+    return add_job(_job_q, "render", key, steps, config=config)
 
 
 # ------------------------------------------------------------------ envoi vers l'iPhone (iCloud Photos)
@@ -428,6 +491,8 @@ def start_import(data):
         raise ValueError("import deja en cours pour ce projet")
     video = os.path.join("input", name + ".mp4")
     have_video = os.path.exists(os.path.join(ROOT, video))
+    if REMOTE and not url and not have_video:
+        raise ValueError("lien Twitch manquant")
     if not have_video and not url:
         raise ValueError("lien Twitch manquant (ou mettre input/" + name + ".mp4)")
     if url and not re.search(r"twitch\.tv/(videos/\d+|[A-Za-z0-9_]+/?$)", url):
@@ -435,7 +500,7 @@ def start_import(data):
     for k in ("start", "end"):
         if data.get(k):
             tsec(data[k])  # leve ValueError si invalide
-    with _lock:
+    with _lock, tasks._Lock():
         meta = projects_meta()
         meta[name] = {**meta.get(name, {}), "creator": creator, "url": url, "created": time.strftime("%Y-%m-%d %H:%M")}
         save_json(PROJECTS, meta)
@@ -446,7 +511,7 @@ def start_import(data):
         vod, login = resolve_twitch(url)
         job["vod"] = vod
         _log(job, f"VOD : {vod}\n")
-        with _lock:
+        with _lock, tasks._Lock():
             meta = projects_meta()
             meta[name]["vod"] = vod
             if login:
@@ -469,6 +534,12 @@ def start_import(data):
             cmd += ["--chat", job["vod"]]
         run_cmd(job, cmd)
 
+    if REMOTE:
+        # le VPS ne telecharge pas la VOD (disque trop petit) : le PC la telecharge et l'analyse
+        def remote_analyze(job):
+            remote_step("analyze", name, vod=job.get("vod") or "", start=str(data.get("start") or ""),
+                        end=str(data.get("end") or ""))(job)
+        return add_job(_import_q, "import", name, [resolve, remote_analyze])
     return add_job(_import_q, "import", name, [resolve, download, analyze])
 
 
@@ -508,7 +579,10 @@ def project_info(name):
     return {
         "name": name, "creator": meta.get("creator") or (cfg or {}).get("creator") or leg_creator or name,
         "url": meta.get("url", ""), "channel": meta.get("channel", ""), "vod": meta.get("vod", ""),
-        "video": os.path.exists(os.path.join(ROOT, "input", name + ".mp4")),
+        "video": os.path.exists(os.path.join(ROOT, "input", name + ".mp4"))
+        or (REMOTE and os.path.exists(os.path.join(ROOT, "work", name, "candidates.txt"))),
+        "source_here": os.path.exists(os.path.join(ROOT, "input", name + ".mp4")),
+        "auto": bool(meta.get("auto")), "title": meta.get("title", ""), "created": meta.get("created", ""),
         "analyzed": os.path.exists(os.path.join(ROOT, "work", name, "candidates.txt")),
         "frame": os.path.exists(os.path.join(ROOT, "work", name, "frame.jpg")),
         "facecam": (cfg or {}).get("facecam") if isinstance((cfg or {}).get("facecam"), list) else fc.get("rect"),
@@ -601,10 +675,256 @@ def write_legendes(name, creator, info, new):
         f.write(text.rstrip("\n") + "\n")
 
 
+# ------------------------------------------------------------------ mot de passe, sessions, jeton du PC (mode VPS)
+def hash_password(pw, salt=None, it=310000):
+    salt = salt or secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), it).hex()
+    return f"pbkdf2${it}${salt}${h}"
+
+
+def check_password(pw):
+    stored = load_json(AUTH, {}).get("password", "")
+    try:
+        _, it, salt, _h = stored.split("$")
+    except ValueError:
+        return False
+    return hmac.compare_digest(hash_password(pw, salt, int(it)), stored)
+
+
+def auth_enabled():
+    return REMOTE or os.path.exists(AUTH)
+
+
+_fails = {}  # ip -> [heures des echecs de connexion]
+
+
+def new_session():
+    tok = secrets.token_urlsafe(32)
+    with _lock:
+        ss = {k: v for k, v in load_json(SESSIONS, {}).items() if v > time.time()}
+        ss[hashlib.sha256(tok.encode()).hexdigest()] = time.time() + SESSION_DAYS * 86400
+        save_json(SESSIONS, ss)
+    return tok
+
+
+def valid_session(tok):
+    if not tok:
+        return False
+    exp = load_json(SESSIONS, {}).get(hashlib.sha256(tok.encode()).hexdigest())
+    return bool(exp and exp > time.time())
+
+
+def drop_session(tok):
+    with _lock:
+        ss = load_json(SESSIONS, {})
+        ss.pop(hashlib.sha256((tok or "").encode()).hexdigest(), None)
+        save_json(SESSIONS, ss)
+
+
+def worker_token_ok(header):
+    tok = load_json(AUTH, {}).get("worker_token", "")
+    got = (header or "").removeprefix("Bearer ").strip()
+    return bool(tok) and hmac.compare_digest(got, tok)
+
+
+_worker_seen = {"t": 0, "name": ""}
+
+LOGIN_PAGE = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Clips GTA VI</title><style>
+body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0612;color:#f6f0ff;
+font:16px/1.45 -apple-system,system-ui,sans-serif;padding:16px;box-sizing:border-box}}
+form{{width:100%;max-width:340px;background:#160d24;border:1px solid #2c1d44;border-radius:16px;padding:24px;box-sizing:border-box}}
+h1{{font-size:20px;margin:0 0 4px}}p{{color:#a194b8;margin:0 0 18px;font-size:14px}}
+label{{display:block;font-size:13px;color:#a194b8;margin-bottom:6px}}
+input{{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #3a2858;background:#0b0612;
+color:#f6f0ff;font-size:16px}}input:focus{{outline:2px solid #ff4fa3;outline-offset:1px}}
+button{{width:100%;margin-top:16px;padding:13px;border:0;border-radius:10px;font-weight:800;font-size:16px;
+background:linear-gradient(100deg,#ff4fa3,#ff9a3c);color:#1a0b2e;cursor:pointer}}
+.err{{color:#ff6b8a;font-size:14px;margin:12px 0 0}}</style></head><body>
+<form method="post" action="/login"><h1>Clips GTA VI</h1><p>Studio privé</p>
+<label for="pw">Mot de passe</label><input id="pw" name="password" type="password" autocomplete="current-password" autofocus required>
+<button type="submit">Se connecter</button>{err}</form></body></html>"""
+
+
+def watch_info():
+    wl = load_json(WATCHLIST, {"streamers": [], "categories": ["Grand Theft Auto VI"]})
+    live = load_json(LIVE, {})
+    seen = _worker_seen["t"]
+    pending = [t for t in tasks.all_tasks() if t["status"] in ("en attente", "en cours")]
+    return {"remote": REMOTE, "streamers": wl.get("streamers", []),
+            "categories": wl.get("categories", ["Grand Theft Auto VI"]), "live": live,
+            "watcher_ok": bool(live.get("updated")) and time.time() - live["updated"] < 300,
+            "worker": {"seen": seen or None, "online": time.time() - seen < 120, "name": _worker_seen["name"]},
+            "tasks_pending": len(pending)}
+
+
+def save_watchlist(data):
+    streamers, seen = [], set()
+    for s in data.get("streamers") or []:
+        s = re.sub(r"^(https?://)?(www\.)?twitch\.tv/", "", str(s).strip()).strip("/ ").lower()
+        if not re.fullmatch(r"[a-z0-9_]{2,25}", s):
+            raise ValueError(f"pseudo Twitch invalide : {s or '(vide)'}")
+        if s not in seen:
+            seen.add(s)
+            streamers.append(s)
+    cats = [str(c).strip() for c in (data.get("categories") or []) if str(c).strip()]
+    if not cats:
+        raise ValueError("au moins une catégorie")
+    with _lock:
+        wl = load_json(WATCHLIST, {})
+        wl.update(streamers=streamers, categories=cats)
+        save_json(WATCHLIST, wl)
+    return wl
+
+
+# fichiers que le PC peut lire / ecrire via /api/worker/file
+WORKER_READ = re.compile(r"^(input|work|clips)/[\w\-]+(/[\w\-]+)?(\.\w+)+$")
+WORKER_WRITE = re.compile(r"^(work/[\w\-]+|work/_render/[\w\-]+|output/[\w\-]+)/[\w\-]+\.(json|txt|jpg|png|mp4|ass)$")
+
+
+def worker_path(rel, rx):
+    if not rel or ".." in rel or not rx.match(rel):
+        return None
+    p = os.path.normpath(os.path.join(ROOT, rel))
+    return p if p.startswith(ROOT + os.sep) else None
+
+
+def merge_sync(entries):
+    if not isinstance(entries, dict) or not entries:
+        return
+    with _lock:
+        cur = load_json(SYNC, {})
+        cur.update(entries)
+        save_json(SYNC, cur)
+
+
+def task_jobs():
+    """Taches du PC sans job de l'appli (lancees par le watcher) : affichees comme des imports."""
+    mine = {j.get("task") for j in _jobs}
+    out = []
+    for t in tasks.all_tasks():
+        if t["id"] in mine or t["kind"] != "analyze":
+            continue
+        out.append({"id": t["id"], "kind": "import", "key": t["project"], "status": t["status"], "log": t["log"],
+                    "started": t.get("started"), "ended": t.get("ended"), "auto": True})
+    return out
+
+
 # ------------------------------------------------------------------ HTTP
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def end_headers(self):
+        if getattr(self, "_dlname", None):
+            self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{urllib.parse.quote(self._dlname)}")
+            self._dlname = None
+        self.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
+        super().end_headers()
+
+    def cookie(self, name):
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == name:
+                return v
+        return None
+
+    def client_ip(self):
+        return (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[-1].strip()
+
+    def logged_in(self):
+        return not auth_enabled() or valid_session(self.cookie("clips_s"))
+
+    def redirect(self, to, cookie=None):
+        self.send_response(303)
+        self.send_header("Location", to)
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def send_html(self, html, code=200):
+        body = html.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_login(self):
+        ip = self.client_ip()
+        now = time.time()
+        fails = [t for t in _fails.get(ip, []) if now - t < 900]
+        _fails[ip] = fails
+        n = int(self.headers.get("Content-Length") or 0)
+        form = urllib.parse.parse_qs(self.rfile.read(min(n, 4096)).decode("utf-8", "replace"))
+        if len(fails) >= 8:
+            return self.send_html(LOGIN_PAGE.format(err='<p class="err">Trop d\'essais. Réessaie dans 15 min.</p>'), 429)
+        if check_password((form.get("password") or [""])[0]):
+            _fails.pop(ip, None)
+            secure = "; Secure" if REMOTE else ""
+            return self.redirect("/", f"clips_s={new_session()}; Path=/; HttpOnly; SameSite=Lax; "
+                                      f"Max-Age={SESSION_DAYS * 86400}{secure}")
+        fails.append(now)
+        time.sleep(1)
+        return self.send_html(LOGIN_PAGE.format(err='<p class="err">Mot de passe incorrect.</p>'), 401)
+
+    def worker_get(self, path, q):
+        if not worker_token_ok(self.headers.get("Authorization")):
+            return self.send_json({"error": "jeton invalide"}, 401)
+        _worker_seen.update(t=time.time(), name=self.headers.get("X-Worker-Name", "PC"))
+        if path == "/api/worker/next":
+            return self.send_json({"task": tasks.claim()})
+        if path == "/api/worker/ping":
+            return self.send_json({"ok": True})
+        rel = (q.get("path") or [""])[0]
+        p = worker_path(rel, WORKER_READ)
+        if not p:
+            return self.send_json({"error": "chemin refuse"}, 403)
+        if path == "/api/worker/stat":
+            if not os.path.isfile(p):
+                return self.send_json({"exists": False})
+            st = os.stat(p)
+            return self.send_json({"exists": True, "size": st.st_size, "mtime": st.st_mtime})
+        if path == "/api/worker/file" and os.path.isfile(p):
+            return self.send_file(p)
+        return self.send_error(404)
+
+    def worker_post(self, path, q):
+        if not worker_token_ok(self.headers.get("Authorization")):
+            return self.send_json({"error": "jeton invalide"}, 401)
+        _worker_seen.update(t=time.time(), name=self.headers.get("X-Worker-Name", "PC"))
+        n = int(self.headers.get("Content-Length") or 0)
+        if path == "/api/worker/file":
+            p = worker_path((q.get("path") or [""])[0], WORKER_WRITE)
+            if not p:
+                return self.send_json({"error": "chemin refuse"}, 403)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            tmp = p + ".upload"
+            left = n
+            with open(tmp, "wb") as f:
+                while left > 0:
+                    chunk = self.rfile.read(min(1 << 20, left))
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    left -= len(chunk)
+            if left:
+                os.remove(tmp)
+                return self.send_json({"error": "envoi incomplet"}, 400)
+            os.replace(tmp, p)
+            return self.send_json({"ok": True})
+        try:
+            data = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError:
+            return self.send_json({"error": "JSON invalide"}, 400)
+        if path == "/api/worker/update":
+            merge_sync(data.get("sync"))
+            t = tasks.update(int(data.get("id") or 0), log=data.get("log"), status=data.get("status"))
+            return self.send_json({"ok": bool(t), "task": t})
+        return self.send_error(404)
 
     def send_json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -659,6 +979,28 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         path = urllib.parse.unquote(u.path)
+        if path == "/robots.txt":
+            body = b"User-agent: *\nDisallow: /\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        if path.startswith("/api/worker/"):
+            return self.worker_get(path, urllib.parse.parse_qs(u.query))
+        if path.startswith("/s/"):
+            return ShareHandler.do_GET(self)
+        if path == "/login":
+            if not auth_enabled():
+                return self.redirect("/")
+            return self.send_html(LOGIN_PAGE.format(err=""))
+        if path == "/logout":
+            drop_session(self.cookie("clips_s"))
+            return self.redirect("/login", "clips_s=; Path=/; Max-Age=0")
+        if not self.logged_in():
+            if path.startswith("/api/"):
+                return self.send_json({"error": "connexion requise"}, 401)
+            return self.redirect("/login")
         if path.startswith("/static/fonts/"):
             base = os.path.join(ROOT, "assets", "fonts")
             p = os.path.normpath(os.path.join(base, path[len("/static/fonts/"):]))
@@ -669,7 +1011,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"clips": all_clips()})
         if path == "/api/jobs":
             with _lock:
-                return self.send_json({"jobs": [public_job(j) for j in reversed(_jobs)]})
+                mine = [public_job(j) for j in reversed(_jobs)]
+            extra = task_jobs() if REMOTE else []
+            jobs = sorted(mine + extra, key=lambda j: -(j.get("started") or j["id"] / 1000))
+            return self.send_json({"jobs": jobs})
+        if path == "/api/watch":
+            return self.send_json(watch_info())
         if path == "/api/projects":
             return self.send_json({"projects": all_projects()})
         m = re.match(r"^/api/projects/([\w\-]+)/candidates$", path)
@@ -712,6 +1059,19 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        u = urllib.parse.urlparse(self.path)
+        if u.path.startswith("/api/worker/"):
+            return self.worker_post(u.path, urllib.parse.parse_qs(u.query))
+        if u.path == "/login":
+            return self.handle_login()
+        if not self.logged_in():
+            return self.send_json({"error": "connexion requise"}, 401)
+        # anti-CSRF : un autre site ne peut pas poster ici avec le cookie de session
+        origin = self.headers.get("Origin")
+        if origin and urllib.parse.urlparse(origin).netloc != self.headers.get("Host"):
+            return self.send_json({"error": "origine refusee"}, 403)
+        if "application/json" not in (self.headers.get("Content-Type") or ""):
+            return self.send_json({"error": "JSON attendu"}, 415)
         n = int(self.headers.get("Content-Length") or 0)
         try:
             data = json.loads(self.rfile.read(n) or b"{}")
@@ -808,6 +1168,12 @@ class Handler(BaseHTTPRequestHandler):
                     s.pop("iphone_dir", None)
                 save_json(SETTINGS, s)
             return self.send_json({"ok": True, "iphone_dir": iphone_dir()})
+        if path == "/api/watch":
+            try:
+                save_watchlist(data)
+            except ValueError as e:
+                return self.send_json({"error": str(e)}, 400)
+            return self.send_json({"ok": True, **watch_info()})
         if path == "/api/import":
             try:
                 return self.send_json({"ok": True, "job": start_import(data)})
@@ -824,6 +1190,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": "clip inconnu"}, 404)
             return self.send_json({"ok": True, "job": queue_render(clip["config"], key)})
         if path == "/api/open":
+            if os.name != "nt":
+                return self.send_json({"error": "dispo seulement sur le PC"}, 400)
             clip = self.clip_from_key(key)
             vid = clip and find_video(clip["source"], clip["name"])
             if not vid:
@@ -866,7 +1234,7 @@ ol{{color:#a194b8;padding-left:20px}}b{{color:#f6f0ff}}small{{color:#a194b8}}</s
 <ol><li>Touche <b>Télécharger la vidéo</b>, puis <b>Télécharger</b>.</li>
 <li>Ouvre les téléchargements (flèche bleue en haut de Safari), touche la vidéo.</li>
 <li>Bouton <b>Partager</b> › <b>Enregistrer la vidéo</b> : elle est dans Photos.</li></ol>
-<small>Lien valable 20 min, seulement sur ton Wi-Fi.</small></body></html>"""
+<small>Lien valable 20 min{where}.</small></body></html>"""
 
 
 class ShareHandler(BaseHTTPRequestHandler):
@@ -884,7 +1252,8 @@ class ShareHandler(BaseHTTPRequestHandler):
         if not m.group(2):
             title = sh["hook"] or sh["name"]
             body = SHARE_PAGE.format(title=title.replace("<", "&lt;"), video=f"/s/{m.group(1)}/video.mp4",
-                                     fname=sh["name"] + ".mp4").encode("utf-8")
+                                     fname=sh["name"] + ".mp4",
+                                     where="" if PUBLIC_URL else ", seulement sur ton Wi-Fi").encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -900,22 +1269,17 @@ class ShareHandler(BaseHTTPRequestHandler):
                 save_json(STATE, state)
         self.send_file(sh["path"], "video/mp4")
 
-    def end_headers(self):
-        if getattr(self, "_dlname", None):
-            self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{urllib.parse.quote(self._dlname)}")
-            self._dlname = None
-        super().end_headers()
+    end_headers = Handler.end_headers
 
 
 def create_share(clip, vid):
     """Cree un lien temporaire Wi-Fi vers un clip ; lance le serveur de partage au premier appel."""
     global _share_srv
-    import secrets
-    ip = lan_ip()
-    if not ip:
+    ip = None if PUBLIC_URL else lan_ip()
+    if not PUBLIC_URL and not ip:
         raise OSError("pas de reseau local : connecte le PC au Wi-Fi ou au cable")
     with _lock:
-        if _share_srv is None:
+        if _share_srv is None and not PUBLIC_URL:
             _share_srv = ThreadingHTTPServer(("0.0.0.0", SHARE_PORT), ShareHandler)
             threading.Thread(target=_share_srv.serve_forever, daemon=True).start()
         now = time.time()
@@ -924,18 +1288,41 @@ def create_share(clip, vid):
         tok = secrets.token_urlsafe(18)
         _shares[tok] = {"key": clip["key"], "path": vid, "name": clip["name"], "hook": clip.get("hook", ""),
                         "expires": now + SHARE_TTL, "downloads": 0}
-    return {"token": tok, "url": f"http://{ip}:{SHARE_PORT}/s/{tok}", "expires": int(now + SHARE_TTL)}
+    base = PUBLIC_URL or f"http://{ip}:{SHARE_PORT}"
+    return {"token": tok, "url": f"{base}/s/{tok}", "expires": int(now + SHARE_TTL)}
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--no-open", action="store_true")
+    ap.add_argument("--set-password", action="store_true", help="choisir le mot de passe de l'appli (mode VPS)")
+    ap.add_argument("--worker-token", action="store_true", help="affiche (ou cree) le jeton du PC")
     args = ap.parse_args()
+    if args.set_password:
+        import getpass
+        pw = os.environ.get("CLIPS_PASSWORD") or getpass.getpass("Nouveau mot de passe : ")
+        if len(pw) < 10:
+            raise SystemExit("10 caracteres minimum")
+        a = load_json(AUTH, {})
+        a["password"] = hash_password(pw)
+        a.setdefault("worker_token", secrets.token_urlsafe(32))
+        save_json(AUTH, a)
+        save_json(SESSIONS, {})  # deconnecte les sessions ouvertes
+        print("Mot de passe enregistre (data/auth.json), sessions fermees.")
+        return
+    if args.worker_token:
+        a = load_json(AUTH, {})
+        if not a.get("worker_token"):
+            a["worker_token"] = secrets.token_urlsafe(32)
+            save_json(AUTH, a)
+        print(a["worker_token"])
+        return
     threading.Thread(target=worker, args=(_job_q,), daemon=True).start()
     threading.Thread(target=worker, args=(_import_q,), daemon=True).start()
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)  # local seulement
-    url = f"http://127.0.0.1:{args.port}"
+    srv = ThreadingHTTPServer((args.host, args.port), Handler)  # 127.0.0.1 : local (ou derriere Caddy sur le VPS)
+    url = PUBLIC_URL or f"http://127.0.0.1:{args.port}"
     print(f"Gestion des clips : {url}  (Ctrl+C pour arreter)")
     if not args.no_open:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()

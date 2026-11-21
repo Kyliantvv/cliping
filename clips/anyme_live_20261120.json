@@ -1,0 +1,79 @@
+{
+ "source": "input/anyme_live_20261120.mp4",
+ "captions": "work/anyme_live_20261120/captions_fw.json",
+ "creator": "Anyme023",
+ "layout": "split",
+ "cam_height": 640,
+ "facecam": [
+  1446,
+  268,
+  440,
+  276
+ ],
+ "jumpcut": true,
+ "fixes": {
+  "GTA 6": "GTA VI",
+  "5M": "FiveM",
+  "Fourier": "fourrière",
+  "Contextion": "Protection",
+  "le cofio": "le coffre",
+  "chiens m'y": "chiens, ils",
+  "petit sur j'étais": "petit sur GTA",
+  "à 5 je détestais": "5, je détestais",
+  "chiliad": "Chiliad"
+ },
+ "highlight": [
+  "ma meuf",
+  "fourrière",
+  "chiens",
+  "crocodile",
+  "nid de poule",
+  "le bif",
+  "Lucia",
+  "Jason"
+ ],
+ "clips": [
+  {
+   "name": "01_braquage_meuf",
+   "start": "00:54:47",
+   "end": "00:57:53",
+   "hook": "Lucia porte tout le butin du braquage",
+   "snap": false
+  },
+  {
+   "name": "02_chiens_braquage",
+   "start": "00:05:50",
+   "end": "00:08:24",
+   "hook": "Les chiens l'attaquent en plein braquage",
+   "snap": false
+  },
+  {
+   "name": "03_fourriere",
+   "start": "00:10:21",
+   "end": "00:12:38.5",
+   "hook": "Il veut récupérer sa caisse à la fourrière",
+   "snap": false
+  },
+  {
+   "name": "04_chauffard",
+   "start": "00:46:14",
+   "end": "00:49:42",
+   "hook": "Anyme, pire chauffeur de GTA VI",
+   "cuts": [
+    [
+     "00:47:12.5",
+     "00:48:49.5"
+    ]
+   ],
+   "snap": false
+  }
+ ],
+ "drop": [
+  "Je t'en masser",
+  "le croque top",
+  "Pour ce temps",
+  "on est arrivés à",
+  "Marley Gaumont",
+  "Oppréhensible"
+ ]
+}
